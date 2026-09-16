@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+*/node_modules/
+client/node_modules/
+server/node_modules/
+package-lock.json.bak
+
+# Next.js Build Outputs
+.next/
+client/.next/
+out/
+client/out/
+build/
+client/build/
+
+# Environment Variables & Secrets
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
+server/.env
+client/.env*
+!client/.env.example
+!server/.env.example
+!.env.example
+
+# Temporary / test outputs & PDFs
+temp/
+server/temp/
+*.pdf
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Operating System & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Typescript
+*.tsbuildinfo
+next-env.d.ts

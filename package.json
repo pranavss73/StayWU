@@ -1,0 +1,15 @@
+{
+  "name": "staywu",
+  "version": "1.0.0",
+  "description": "StayWU — Trust & Discovery + AI Trip Concierge for Goa",
+  "scripts": {
+    "install:all": "npm install --prefix server && npm install --prefix client",
+    "dev:server": "npm --prefix server start",
+    "dev:client": "npm --prefix client run dev",
+    "dev": "concurrently -n SERVER,CLIENT -c cyan,magenta \"npm --prefix server start\" \"npm --prefix client run dev\"",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
