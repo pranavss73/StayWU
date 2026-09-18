@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: staywu-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY_BACKUP
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        value: StayWU_bot
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGIN
+        value: "*"

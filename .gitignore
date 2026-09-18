@@ -28,6 +28,9 @@ client/.env*
 # Temporary / test outputs & PDFs
 temp/
 server/temp/
+StayWU_QR/
+server/storage/vault_docs/*
+!server/storage/vault_docs/.gitkeep
 *.pdf
 *.log
 npm-debug.log*

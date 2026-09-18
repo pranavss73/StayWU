@@ -6,34 +6,45 @@ const cors = require('cors');
 
 const DataService = require('./services/data');
 const LLMService = require('./services/llm');
+const VaultService = require('./services/vaultService');
 const TripBot = require('./bot/telegram');
 
 const hotelsRoutes = require('./routes/hotels');
 const chatRoutes = require('./routes/chat');
 const bookingsRoutes = require('./routes/bookings');
+const vaultRoutes = require('./routes/vault');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+const corsOrigin = process.env.CORS_ORIGIN || '*';
+app.use(cors({
+  origin: corsOrigin === '*' ? true : [corsOrigin, /\.vercel\.app$/, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-vault-session-token', 'x-vault-user-id', 'x-bypass-session'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Initialize services
 const dataService = new DataService();
-const llmService = new LLMService(process.env.GEMINI_API_KEY);
+const llmService = new LLMService(process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_BACKUP);
+const vaultService = new VaultService(process.env.FRONTEND_URL || 'http://localhost:3000');
 
 // Initialize Telegram bot
 const tripBot = new TripBot(
   process.env.TELEGRAM_BOT_TOKEN,
   dataService,
-  llmService
+  llmService,
+  vaultService
 );
 
 // Routes
 app.use('/api/hotels', hotelsRoutes(dataService));
 app.use('/api/chat', chatRoutes(dataService, llmService));
 app.use('/api/bookings', bookingsRoutes(dataService));
+app.use('/api/vault', vaultRoutes(vaultService));
 
 // Places endpoint
 app.get('/api/places', (req, res) => {

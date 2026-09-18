@@ -5,7 +5,7 @@ const PDFItineraryGenerator = require('../services/pdfGenerator');
 const WeatherService = require('../services/weather');
 
 class TripBot {
-  constructor(token, dataService, llmService) {
+  constructor(token, dataService, llmService, vaultService = null) {
     if (!token) {
       console.log('⚠️  No Telegram bot token provided. Bot will not start.');
       this.bot = null;
@@ -15,12 +15,29 @@ class TripBot {
     this.bot = new TelegramBot(token, { polling: true });
     this.dataService = dataService;
     this.llmService = llmService;
+    this.vaultService = vaultService;
 
     // User session storage: chatId -> { state, booking, preferences, history, itinerary }
     this.sessions = new Map();
 
+    this.registerCommands();
     this.setupHandlers();
     console.log('🤖 Telegram Bot started!');
+  }
+
+  async registerCommands() {
+    if (!this.bot) return;
+    try {
+      await this.bot.setMyCommands([
+        { command: 'document', description: 'Access your secure QR document vault & guest check-in' },
+        { command: 'link', description: 'Link Telegram to StayWU account with 6-digit code' },
+        { command: 'plan', description: 'Generate a personalized Goa travel itinerary' },
+        { command: 'pdf', description: 'Download trip itinerary and vouchers as PDF' },
+        { command: 'help', description: 'Show concierge commands and guide' },
+      ]);
+    } catch (err) {
+      console.warn('Telegram setMyCommands warning:', err.message);
+    }
   }
 
   setupHandlers() {
@@ -31,25 +48,41 @@ class TripBot {
       const chatId = msg.chat.id;
       const bookingId = match[1]?.trim();
 
+      // Check if deep link is account linking
+      if (bookingId && (bookingId.startsWith('link_') || bookingId.startsWith('vault_'))) {
+        const code = bookingId.replace(/^(link_|vault_)/, '').trim();
+        if (this.vaultService) {
+          const res = this.vaultService.linkTelegramChat(chatId, code);
+          await this.bot.sendMessage(chatId, res.message);
+          await this.sendVaultMenu(chatId);
+          return;
+        }
+      }
+
       if (bookingId) {
         const booking = this.dataService.getBooking(bookingId);
         if (booking) {
+          const hotelDetails = this.dataService.getHotel(booking.hotelId);
           this.sessions.set(chatId, {
             state: 'onboarding_interests',
-            booking,
+            booking: {
+              ...booking,
+              hotelDetails: hotelDetails || null
+            },
             preferences: {},
             history: [],
             itinerary: null,
           });
 
           await this.bot.sendMessage(chatId,
-            `🌴 *Welcome to StayWU Trip Concierge!*\n\n` +
-            `I'm your personal AI travel guide for your Goa trip!\n\n` +
-            `📍 *Hotel:* ${booking.hotelName}\n` +
-            `📅 *Check-in:* ${booking.checkIn}\n` +
-            `📅 *Check-out:* ${booking.checkOut}\n` +
-            `📌 *Area:* ${booking.location}\n\n` +
-            `Let me plan an amazing trip for you! First, tell me what you're interested in:`,
+            `🏨 *Welcome to StayWU Hotel & Trip Concierge!*\n\n` +
+            `I'm your personal AI Concierge for your stay in Goa!\n\n` +
+            `📍 *Confirmed Stay:* ${booking.hotelName}\n` +
+            `🛡️ *Trust Score:* ${hotelDetails ? hotelDetails.trust_score + '/100 (' + hotelDetails.trust_badge + ')' : 'Verified'}\n` +
+            `📌 *Location:* ${booking.location}${booking.area ? ', ' + booking.area : ''}\n` +
+            `📅 *Dates:* ${booking.checkIn} to ${booking.checkOut}\n` +
+            (hotelDetails?.amenities?.length ? `✨ *Verified Amenities:* ${hotelDetails.amenities.slice(0, 5).join(', ')}\n` : '') +
+            `\nLet's craft your custom, weather-aware daily itinerary anchored to your hotel. What are you most interested in?`,
             {
               parse_mode: 'Markdown',
               reply_markup: {
@@ -91,14 +124,15 @@ class TripBot {
       });
 
       await this.bot.sendMessage(chatId,
-        `🌴 *Welcome to StayWU Trip Concierge!*\n\n` +
-        `I'm your AI travel guide for Goa! 🇮🇳\n\n` +
-        `You can:\n` +
-        `• Ask me anything about Goa\n` +
-        `• Get restaurant recommendations\n` +
-        `• Find the best beaches and activities\n\n` +
-        `💡 *Tip:* Book a hotel on our website to get a personalized trip itinerary!\n\n` +
-        `What would you like to know?`,
+        `🏨 *Welcome to StayWU Hotel & Trip Concierge!*\n\n` +
+        `I'm your personal AI Concierge for Goa accommodations, stay verification, and trip planning! 🇮🇳\n\n` +
+        `You can ask me:\n` +
+        `• 🛡️ *Hotel Verification & Trust Scores* — Check if any hotel or villa is verified and safe\n` +
+        `• 🔍 *Find Ideal Stays* — Discover hotels by budget, pool, beachfront, or neighborhood vibe\n` +
+        `• 🌴 *Stay-Centric Travel Advice* — Best dining, beaches, and scooter routes near your accommodation\n` +
+        `• 🌤️ *Live Weather* — Current conditions and upcoming rain forecast\n\n` +
+        `💡 *Tip:* If you booked on StayWU, tap your confirmation link to unlock your full hotel-anchored itinerary!\n\n` +
+        `How can I assist your stay in Goa today?`,
         { parse_mode: 'Markdown' }
       );
     });
@@ -219,6 +253,27 @@ class TripBot {
           );
           return;
         }
+        // Vault help
+        if (data === 'vault_help') {
+          const frontendUrl = (this.vaultService?.frontendBaseUrl || 'http://127.0.0.1:3000').replace('//localhost', '//127.0.0.1');
+          await this.bot.sendMessage(chatId,
+            `🛡️ *StayWU Document Vault Security Architecture*\n\n` +
+            `• *Zero Plaintext Storage:* Your PIN is hashed with cryptographically random salt & scrypt.\n` +
+            `• *No Telegram PINs:* Your PIN is *never* requested or typed into Telegram chats.\n` +
+            `• *Private Storage:* Travel documents are stored outside public directories with UUID filenames.\n` +
+            `• *Opaque QR Codes:* QR codes contain only random 256-bit tokens, no PII or direct document URLs.\n` +
+            `• *Temporary Shares:* Generate expiring, revocable shares for hotel check-ins or scooter rentals.\n\n` +
+            `Access your vault: [StayWU Document Vault](${frontendUrl}/documents)`,
+            { parse_mode: 'Markdown' }
+          );
+          return;
+        }
+
+        // Vault refresh
+        if (data === 'vault_refresh') {
+          await this.sendVaultMenu(chatId);
+          return;
+        }
       } catch (err) {
         console.warn('Telegram callback_query error:', err.message);
       }
@@ -228,8 +283,35 @@ class TripBot {
     this.bot.on('message', async (msg) => {
       try {
         if (msg.text?.startsWith('/')) {
+          // Handle /document, /documents, /vault, /qr commands
+          if (msg.text.match(/^\/(?:document|documents|vault|qr)(?:@\w+)?(?:\s|$)/i)) {
+            await this.sendVaultMenu(msg.chat.id);
+            return;
+          }
+
+          // Handle /link command
+          if (msg.text.match(/^\/link(?:@\w+)?(?:\s+(.*))?$/i)) {
+            const match = msg.text.match(/^\/link(?:@\w+)?(?:\s+(.*))?$/i);
+            const code = match?.[1]?.trim();
+            if (!code) {
+              await this.bot.sendMessage(msg.chat.id,
+                'ℹ️ *Please provide your 6-character linking code from the StayWU website.*\n\nExample: `/link SW8K9Z`',
+                { parse_mode: 'Markdown' }
+              );
+              return;
+            }
+            if (this.vaultService) {
+              const res = this.vaultService.linkTelegramChat(msg.chat.id, code);
+              await this.bot.sendMessage(msg.chat.id, res.message);
+              if (res.success) {
+                await this.sendVaultMenu(msg.chat.id);
+              }
+            }
+            return;
+          }
+
           // Handle /skip command
-          if (msg.text === '/skip') {
+          if (msg.text.match(/^\/skip(?:@\w+)?(?:\s|$)/i)) {
             const session = this.sessions.get(msg.chat.id);
             if (session && session.state === 'onboarding_special') {
               session.preferences.specialRequests = 'None';
@@ -238,21 +320,23 @@ class TripBot {
             return;
           }
           // Handle /pdf command
-          if (msg.text === '/pdf') {
+          if (msg.text.match(/^\/pdf(?:@\w+)?(?:\s|$)/i)) {
             await this.generateAndSendPDF(msg.chat.id);
             return;
           }
           // Handle /plan command
-          if (msg.text === '/plan') {
+          if (msg.text.match(/^\/plan(?:@\w+)?(?:\s|$)/i)) {
             await this.generateAndSendItinerary(msg.chat.id);
             return;
           }
           // Handle /help command
-          if (msg.text === '/help') {
+          if (msg.text.match(/^\/help(?:@\w+)?(?:\s|$)/i)) {
             await this.bot.sendMessage(msg.chat.id,
               `📋 *StayWU Trip Concierge Commands:*\n\n` +
-              `/plan — Generate a new itinerary\n` +
-              `/pdf — Download your itinerary as PDF\n` +
+              `/document — Access your Secure Document Vault & QR check-in\n` +
+              `/link <code> — Connect your Telegram account to StayWU Vault\n` +
+              `/plan — Generate a new personalized itinerary\n` +
+              `/pdf — Download your itinerary and vouchers as PDF\n` +
               `/help — Show this help message\n\n` +
               `Or just type any question about Goa! 🌴`,
               { parse_mode: 'Markdown' }
@@ -320,11 +404,21 @@ class TripBot {
     await this.bot.sendMessage(chatId, '🔄 Generating your personalized itinerary... This may take a moment! ✨');
 
     try {
-      const bookingDetails = session.booking || {
+      let hotelDetails = session.booking?.hotelDetails;
+      if (!hotelDetails && session.booking?.hotelId) {
+        hotelDetails = this.dataService.getHotel(session.booking.hotelId);
+        if (hotelDetails && session.booking) session.booking.hotelDetails = hotelDetails;
+      }
+
+      const bookingDetails = session.booking ? {
+        ...session.booking,
+        hotelDetails
+      } : {
         hotelName: 'Your Hotel in Goa',
         location: 'Goa',
         checkIn: 'Tomorrow',
         checkOut: 'In 3 days',
+        hotelDetails: null
       };
 
       const places = this.dataService.getPlaces();
@@ -692,19 +786,32 @@ class TripBot {
     await this.bot.sendChatAction(chatId, 'typing');
 
     try {
-      const tripContext = session.booking || {
+      let hotelDetails = session.booking?.hotelDetails;
+      if (!hotelDetails && session.booking?.hotelId) {
+        hotelDetails = this.dataService.getHotel(session.booking.hotelId);
+        if (hotelDetails && session.booking) session.booking.hotelDetails = hotelDetails;
+      }
+
+      const tripContext = session.booking ? {
+        ...session.booking,
+        hotelDetails
+      } : {
         hotelName: 'General inquiry',
         location: 'Goa',
         checkIn: 'N/A',
         checkOut: 'N/A',
+        hotelDetails: null
       };
 
       const places = this.dataService.getPlaces();
 
+      // Retrieve real hotel catalog matches based on user's query
+      const relevantHotels = this.dataService.getHotelsForContext(userMessage, 6);
+
       // Ensure we have weather for live Q&A
       if (!session.weather) {
         try {
-          session.weather = await WeatherService.getWeather(tripContext.location);
+          session.weather = await WeatherService.getWeather(tripContext.location || 'Goa');
         } catch { }
       }
 
@@ -713,7 +820,8 @@ class TripBot {
         tripContext,
         places,
         session.history.slice(-10), // Last 10 messages for context
-        session.weather
+        session.weather,
+        relevantHotels
       );
 
       // Update history
@@ -771,6 +879,69 @@ class TripBot {
       watersports: '🌊', wellness: '🧘', shopping: '🛍️', nature: '🌿',
     };
     return map[interest] || '✨';
+  }
+
+  // Telegram /document secure menu
+  async sendVaultMenu(chatId) {
+    try {
+      const frontendUrl = (this.vaultService?.frontendBaseUrl || 'http://127.0.0.1:3000').replace('//localhost', '//127.0.0.1');
+      const linkedUserId = this.vaultService?.getUserIdForTelegramChat(chatId);
+      const status = this.vaultService?.getVaultStatus(linkedUserId || 'traveler_default');
+
+      // Generate secure one-time vault link
+      let secureVaultUrl = `${frontendUrl}/documents`;
+      try {
+        const linkData = await this.vaultService?.generateTelegramVaultLink(chatId);
+        if (linkData?.targetUrl) {
+          secureVaultUrl = linkData.targetUrl.replace('//localhost', '//127.0.0.1');
+        }
+      } catch (err) {
+        console.warn('generateTelegramVaultLink warning:', err.message);
+      }
+
+      const statusBadge = linkedUserId
+        ? '🔗 *Connected Account:* Verified StayWU Traveler'
+        : 'ℹ️ *Account:* Demo Traveler (Use `/link <code>` to link your account)';
+
+      const messageText =
+        `🛡️ *StayWU Secure Document Vault*\n` +
+        `_Your travel documents. Encrypted. Accessible anywhere._\n\n` +
+        `${statusBadge}\n` +
+        `📁 *Protected Documents:* ${status?.totalDocuments || 0}\n` +
+        `🔐 *PIN Security:* ${status?.isPinSet ? 'Active ✓ (Encrypted)' : 'Setup Required'}\n` +
+        `📤 *Active Shares:* ${status?.activeSharesCount || 0}\n\n` +
+        `⚠️ *Zero-Trust Security:* Your PIN is *never* entered inside Telegram.\n\n` +
+        `👇 *Tap a button below or use these links:*\n` +
+        `• [🔐 Open Secure Vault (Enter PIN)](${secureVaultUrl})\n` +
+        `• [📂 My Documents](${frontendUrl}/documents)\n` +
+        `• [📤 Manage Sharing & QR Codes](${frontendUrl}/documents#shares)`;
+
+      // Telegram Bot API accepts http://127.0.0.1 or https:// for inline keyboard buttons
+      const keyboard = [
+        [{ text: '🔐 Open Secure Vault (Enter PIN)', url: secureVaultUrl }],
+        [
+          { text: '📂 My Documents', url: `${frontendUrl}/documents` },
+          { text: '📤 Manage Shares', url: `${frontendUrl}/documents#shares` },
+        ],
+        [
+          { text: '❓ Vault Help & Security', callback_data: 'vault_help' },
+          { text: '🔄 Refresh Status', callback_data: 'vault_refresh' },
+        ],
+      ];
+
+      await this.bot.sendMessage(chatId, messageText, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard },
+      }).catch(async (sendErr) => {
+        console.warn('sendVaultMenu send failed, trying plain fallback:', sendErr.message);
+        await this.bot.sendMessage(chatId,
+          `StayWU Document Vault\n\nOpen Vault: ${secureVaultUrl}\nMy Documents: ${frontendUrl}/documents`
+        );
+      });
+    } catch (error) {
+      console.error('sendVaultMenu error:', error);
+      await this.bot.sendMessage(chatId, '❌ Unable to load document vault menu. Please try again with /document');
+    }
   }
 }
 

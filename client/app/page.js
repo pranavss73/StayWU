@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -35,12 +36,13 @@ import {
   SlidersHorizontal,
   CloudSun,
   Compass,
-  FileCheck
+  FileCheck,
+  KeyRound,
+  QrCode
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AuthModal from '../components/AuthModal';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/api';
+import { API_BASE } from '@/lib/api';
 
 // ============================================
 // Top Live Weather & Radar Ticker Strip
@@ -58,6 +60,8 @@ function TopTicker() {
         <div className="ticker-item" style={{ display: 'none', md: 'inline-flex' }}>
           <span className="ticker-divider">•</span>
           <span>2,403 Local Properties Audited</span>
+          <span className="ticker-divider">•</span>
+          <span>Encrypted Document Vault Active</span>
           <span className="ticker-divider">•</span>
           <span>Telegram Concierge @StayWU_bot Active</span>
         </div>
@@ -114,6 +118,10 @@ function NavbarUser({ onOpenAuth }) {
             <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'white' }}>{displayName}</div>
             <div className="nav-user-email">{user.email}</div>
           </div>
+          <Link href="/documents" className="nav-dropdown-item" onClick={() => setDropdownOpen(false)}>
+            <KeyRound size={14} />
+            <span>Document Vault</span>
+          </Link>
           <button
             className="nav-dropdown-item"
             onClick={() => {
@@ -1016,6 +1024,10 @@ export default function Home() {
             </div>
 
             <div className="nav-auth-group">
+              <Link href="/documents" className="nav-vault-btn" title="Open Document Vault">
+                <KeyRound size={13} />
+                <span>Vault</span>
+              </Link>
               <NavbarUser onOpenAuth={openAuth} />
             </div>
           </div>
@@ -1062,10 +1074,15 @@ export default function Home() {
           <ul className="navbar-nav">
             <li><a href="#hotels">Curated Stays</a></li>
             <li><a href="#trust-matrix">Trust Architecture</a></li>
+            <li><Link href="/documents" style={{ color: 'var(--accent-gold)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><KeyRound size={13} /> Vault</Link></li>
             <li><a href="#about">About</a></li>
           </ul>
 
           <div className="nav-auth-group">
+            <Link href="/documents" className="nav-vault-btn" title="Open Document Vault">
+              <KeyRound size={13} />
+              <span>Vault</span>
+            </Link>
             <NavbarUser onOpenAuth={openAuth} />
           </div>
         </div>
@@ -1239,6 +1256,16 @@ export default function Home() {
               <h3 className="pillar-title">Telegram Concierge Sync</h3>
               <p className="pillar-desc">
                 Confirmed reservations instantly sync with @StayWU_bot, generating a weather-adapted day-by-day itinerary and luxury PDF dossier.
+              </p>
+            </div>
+
+            <div className="trust-pillar-card">
+              <div className="pillar-icon-box" style={{ color: 'var(--accent-gold)', background: 'var(--accent-gold-bg)' }}>
+                <KeyRound size={20} />
+              </div>
+              <h3 className="pillar-title">Zero-Trust Document Vault</h3>
+              <p className="pillar-desc">
+                Store travel IDs in an encrypted vault with 15-min auto-expiring QR check-ins. Front desks never need paper photocopies.
               </p>
             </div>
           </div>
