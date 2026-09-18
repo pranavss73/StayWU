@@ -114,11 +114,15 @@ export default function LoginPage() {
       {/* Mini Nav */}
       <nav className="navbar">
         <div className="navbar-inner">
-          <Link href="/" className="navbar-logo">
-            <div className="navbar-logo-icon">
-              <Building2 size={18} color="white" />
+          <Link href="/" className="navbar-brand-group" style={{ textDecoration: 'none' }}>
+            <div className="brand-mark" aria-hidden="true">
+              <span className="brand-mark-char">S</span>
+              <span className="brand-mark-sub">W</span>
             </div>
-            StayWU
+            <div className="brand-text-block">
+              <span className="brand-title">STAYWU</span>
+              <span className="brand-tag">GOA TRUST ATLAS</span>
+            </div>
           </Link>
           <Link href="/" className="back-link">
             <ArrowLeft size={16} />
@@ -131,7 +135,7 @@ export default function LoginPage() {
       <main className="login-main-wrapper">
         <div className="login-card">
           <div className="auth-brand-badge" style={{ marginBottom: 12 }}>
-            <ShieldCheck size={16} color="var(--accent-primary)" />
+            <ShieldCheck size={16} color="var(--accent-gold)" />
             <span>Verified Travel ID</span>
           </div>
 

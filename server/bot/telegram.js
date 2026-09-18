@@ -15,7 +15,7 @@ class TripBot {
     this.bot = new TelegramBot(token, { polling: true });
     this.dataService = dataService;
     this.llmService = llmService;
-    
+
     // User session storage: chatId -> { state, booking, preferences, history, itinerary }
     this.sessions = new Map();
 
@@ -119,17 +119,17 @@ class TripBot {
         const session = this.sessions.get(chatId);
 
         if (!session) {
-          await this.bot.answerCallbackQuery(query.id, { text: 'Please start with /start' }).catch(() => {});
+          await this.bot.answerCallbackQuery(query.id, { text: 'Please start with /start' }).catch(() => { });
           return;
         }
 
-        await this.bot.answerCallbackQuery(query.id).catch(() => {});
+        await this.bot.answerCallbackQuery(query.id).catch(() => { });
 
         // Interest selection
         if (data.startsWith('interest_')) {
           const interest = data.replace('interest_', '');
           if (!session.preferences.interests) session.preferences.interests = [];
-          
+
           if (session.preferences.interests.includes(interest)) {
             session.preferences.interests = session.preferences.interests.filter(i => i !== interest);
             await this.bot.sendMessage(chatId, `Removed: ${this.interestEmoji(interest)} ${interest}`);
@@ -140,85 +140,85 @@ class TripBot {
           return;
         }
 
-      // Done selecting interests
-      if (data === 'interests_done') {
-        session.state = 'onboarding_pace';
-        await this.bot.sendMessage(chatId,
-          `Great choices! 🎯\n\nSelected: ${(session.preferences.interests || ['general']).map(i => this.interestEmoji(i) + ' ' + i).join(', ')}\n\nNow, what's your preferred travel pace?`,
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: '🐢 Relaxed — Take it slow', callback_data: 'pace_relaxed' },
+        // Done selecting interests
+        if (data === 'interests_done') {
+          session.state = 'onboarding_pace';
+          await this.bot.sendMessage(chatId,
+            `Great choices! 🎯\n\nSelected: ${(session.preferences.interests || ['general']).map(i => this.interestEmoji(i) + ' ' + i).join(', ')}\n\nNow, what's your preferred travel pace?`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    { text: '🐢 Relaxed — Take it slow', callback_data: 'pace_relaxed' },
+                  ],
+                  [
+                    { text: '⚖️ Moderate — Balanced mix', callback_data: 'pace_moderate' },
+                  ],
+                  [
+                    { text: '🚀 Packed — See everything!', callback_data: 'pace_packed' },
+                  ],
                 ],
-                [
-                  { text: '⚖️ Moderate — Balanced mix', callback_data: 'pace_moderate' },
-                ],
-                [
-                  { text: '🚀 Packed — See everything!', callback_data: 'pace_packed' },
-                ],
-              ],
-            },
-          }
-        );
-        return;
-      }
+              },
+            }
+          );
+          return;
+        }
 
-      // Pace selection
-      if (data.startsWith('pace_')) {
-        session.preferences.pace = data.replace('pace_', '');
-        session.state = 'onboarding_budget';
-        await this.bot.sendMessage(chatId,
-          `Got it — ${session.preferences.pace} pace! 👍\n\nWhat's your daily budget (excluding accommodation)?`,
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: '💰 Budget (₹500-1500/day)', callback_data: 'budget_budget' },
+        // Pace selection
+        if (data.startsWith('pace_')) {
+          session.preferences.pace = data.replace('pace_', '');
+          session.state = 'onboarding_budget';
+          await this.bot.sendMessage(chatId,
+            `Got it — ${session.preferences.pace} pace! 👍\n\nWhat's your daily budget (excluding accommodation)?`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    { text: '💰 Budget (₹500-1500/day)', callback_data: 'budget_budget' },
+                  ],
+                  [
+                    { text: '💵 Moderate (₹1500-4000/day)', callback_data: 'budget_moderate' },
+                  ],
+                  [
+                    { text: '💎 Luxury (₹4000+/day)', callback_data: 'budget_luxury' },
+                  ],
                 ],
-                [
-                  { text: '💵 Moderate (₹1500-4000/day)', callback_data: 'budget_moderate' },
-                ],
-                [
-                  { text: '💎 Luxury (₹4000+/day)', callback_data: 'budget_luxury' },
-                ],
-              ],
-            },
-          }
-        );
-        return;
-      }
+              },
+            }
+          );
+          return;
+        }
 
-      // Budget selection
-      if (data.startsWith('budget_')) {
-        session.preferences.budget = data.replace('budget_', '');
-        session.state = 'onboarding_special';
-        await this.bot.sendMessage(chatId,
-          `Perfect! 💰\n\nAny special requests or preferences? (e.g., "vegetarian food only", "avoid crowded places", "looking for romantic spots")\n\nType your request or send /skip to continue.`,
-        );
-        return;
-      }
+        // Budget selection
+        if (data.startsWith('budget_')) {
+          session.preferences.budget = data.replace('budget_', '');
+          session.state = 'onboarding_special';
+          await this.bot.sendMessage(chatId,
+            `Perfect! 💰\n\nAny special requests or preferences? (e.g., "vegetarian food only", "avoid crowded places", "looking for romantic spots")\n\nType your request or send /skip to continue.`,
+          );
+          return;
+        }
 
-      // Generate itinerary button
-      if (data === 'generate_itinerary') {
-        await this.generateAndSendItinerary(chatId);
-        return;
-      }
+        // Generate itinerary button
+        if (data === 'generate_itinerary') {
+          await this.generateAndSendItinerary(chatId);
+          return;
+        }
 
-      // Download PDF
-      if (data === 'download_pdf') {
-        await this.generateAndSendPDF(chatId);
-        return;
-      }
+        // Download PDF
+        if (data === 'download_pdf') {
+          await this.generateAndSendPDF(chatId);
+          return;
+        }
 
-      // Continue chatting
-      if (data === 'continue_chat') {
-        session.state = 'free_chat';
-        await this.bot.sendMessage(chatId,
-          `Sure! Ask me anything about Goa — restaurants, activities, transport, tips! 🌴`,
-        );
-        return;
-      }
+        // Continue chatting
+        if (data === 'continue_chat') {
+          session.state = 'free_chat';
+          await this.bot.sendMessage(chatId,
+            `Sure! Ask me anything about Goa — restaurants, activities, transport, tips! 🌴`,
+          );
+          return;
+        }
       } catch (err) {
         console.warn('Telegram callback_query error:', err.message);
       }
@@ -328,7 +328,7 @@ class TripBot {
       };
 
       const places = this.dataService.getPlaces();
-      
+
       // Fetch live weather & forecast for this hotel's location
       let weather = null;
       try {
@@ -354,7 +354,7 @@ class TripBot {
 
       // Format into premium, highly readable Telegram card messages
       const cards = this.formatItineraryForTelegram(itinerary, bookingDetails, session.preferences, weather);
-      
+
       for (let i = 0; i < cards.length; i++) {
         await this.sendSafeMessage(chatId, cards[i]);
         if (i < cards.length - 1) {
@@ -406,7 +406,7 @@ class TripBot {
         try {
           const loc = session.booking?.location || session.booking?.area || 'Goa';
           session.weather = await WeatherService.getWeather(loc);
-        } catch {}
+        } catch { }
       }
 
       await PDFItineraryGenerator.generate(session.itinerary, session.booking, pdfPath, session.weather);
@@ -419,7 +419,7 @@ class TripBot {
 
       // Clean up after 15 seconds
       setTimeout(() => {
-        try { if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath); } catch {}
+        try { if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath); } catch { }
       }, 15000);
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -482,7 +482,7 @@ class TripBot {
       const w = weather.current;
       let forecastLines = '';
       if (weather.daily && weather.daily.length > 0) {
-        forecastLines = weather.daily.slice(0, 5).map((d, i) => 
+        forecastLines = weather.daily.slice(0, 5).map((d, i) =>
           `• *Day ${i + 1} (${d.dayName}):* ${d.icon} ${d.maxTemp}°C / ${d.minTemp}°C • ${d.condition}${d.rainProb >= 40 ? ` (${d.rainProb}% rain)` : ''}`
         ).join('\n');
       }
@@ -548,7 +548,7 @@ class TripBot {
           } else {
             const catEmoji = cat.toLowerCase().includes('transport') ? '🛵' :
               cat.toLowerCase().includes('dining') || cat.toLowerCase().includes('food') ? '🍽️' :
-              cat.toLowerCase().includes('sight') || cat.toLowerCase().includes('entry') ? '🏛️' : '🎉';
+                cat.toLowerCase().includes('sight') || cat.toLowerCase().includes('entry') ? '🏛️' : '🎉';
             bCard += `${catEmoji} *${cat}:* ${cost}` + (desc ? `\n   └ _${desc.substring(0, 80)}_` : '') + `\n\n`;
           }
         }
@@ -647,7 +647,7 @@ class TripBot {
       const pLower = p.title.toLowerCase();
       const emoji = pLower.includes('morning') ? '🌅' :
         pLower.includes('afternoon') ? '☀️' :
-        pLower.includes('evening') || pLower.includes('night') ? '🌇' : '🍽️';
+          pLower.includes('evening') || pLower.includes('night') ? '🌇' : '🍽️';
       card += `${emoji} *${p.title.toUpperCase()}*\n`;
       for (const item of p.items) {
         card += `${item}\n`;
@@ -687,7 +687,7 @@ class TripBot {
 
   async handleFreeChat(chatId, userMessage) {
     const session = this.sessions.get(chatId);
-    
+
     // Show typing indicator
     await this.bot.sendChatAction(chatId, 'typing');
 
@@ -700,12 +700,12 @@ class TripBot {
       };
 
       const places = this.dataService.getPlaces();
-      
+
       // Ensure we have weather for live Q&A
       if (!session.weather) {
         try {
           session.weather = await WeatherService.getWeather(tripContext.location);
-        } catch {}
+        } catch { }
       }
 
       const reply = await this.llmService.chatTripAssistant(
@@ -738,16 +738,16 @@ class TripBot {
   // Utility: split long messages for Telegram
   splitMessage(text, maxLength) {
     if (text.length <= maxLength) return [text];
-    
+
     const chunks = [];
     let remaining = text;
-    
+
     while (remaining.length > 0) {
       if (remaining.length <= maxLength) {
         chunks.push(remaining);
         break;
       }
-      
+
       // Find a good split point
       let splitIndex = remaining.lastIndexOf('\n\n', maxLength);
       if (splitIndex === -1 || splitIndex < maxLength * 0.5) {
@@ -756,11 +756,11 @@ class TripBot {
       if (splitIndex === -1 || splitIndex < maxLength * 0.5) {
         splitIndex = maxLength;
       }
-      
+
       chunks.push(remaining.substring(0, splitIndex));
       remaining = remaining.substring(splitIndex).trim();
     }
-    
+
     return chunks;
   }
 
