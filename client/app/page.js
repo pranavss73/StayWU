@@ -40,7 +40,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import AuthModal from '../components/AuthModal';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/api';
 
 // ============================================
 // Top Live Weather & Radar Ticker Strip
