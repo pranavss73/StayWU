@@ -120,17 +120,18 @@ export default function DocumentVaultPage() {
   // ========================================================
   // Initial Status Fetch
   // ========================================================
-  const fetchStatus = async () => {
+  const fetchStatus = async (overrideToken = null) => {
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/vault/status?userId=${encodeURIComponent(userId)}`);
       if (res.ok) {
         const data = await res.json();
         setVaultStatus(data);
+        const hasToken = overrideToken !== null ? overrideToken : !!sessionToken;
         if (!data.isPinSet) {
           setPinMode('setup');
           setShowPinModal(true);
-        } else if (!sessionToken) {
+        } else if (!hasToken) {
           setPinMode('unlock');
           setShowPinModal(true);
         }
@@ -143,7 +144,18 @@ export default function DocumentVaultPage() {
   };
 
   useEffect(() => {
-    fetchStatus();
+    // Whenever userId changes (e.g. login/logout/switch accounts), completely reset state
+    setSessionToken(null);
+    setSessionExpiresAt(null);
+    setSessionCountdown(0);
+    setDocuments([]);
+    setActiveShares([]);
+    setAuditLogs([]);
+    setPinInput('');
+    setOldPinInput('');
+    setConfirmPinInput('');
+    setPinError('');
+    fetchStatus(false);
   }, [userId]);
 
   // Session timer countdown
@@ -318,6 +330,8 @@ export default function DocumentVaultPage() {
     setSessionToken(null);
     setSessionExpiresAt(null);
     setDocuments([]);
+    setActiveShares([]);
+    setAuditLogs([]);
     setPinMode('unlock');
     setPinInput('');
     setShowPinModal(true);

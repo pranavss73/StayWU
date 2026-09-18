@@ -47,6 +47,29 @@ class VaultService {
     this.db.shares = this.db.shares || []; // [ { id, userId, token, documentIds, createdAt, expiresAt, revokedAt, status } ]
     this.db.auditLogs = this.db.auditLogs || []; // [ { id, timestamp, userId, action, documentName, status, details } ]
     this.db.telegramLinks = this.db.telegramLinks || {}; // chatId -> userId & userId -> chatId
+
+    // Purge any legacy sample documents & demo audit logs across all users
+    let modified = false;
+    const initialDocCount = this.db.documents.length;
+    this.db.documents = this.db.documents.filter(d => 
+      !(
+        (d.displayName === 'Official Travel Passport' && (d.originalFilename === 'Passport_Gov_India.pdf' || d.size === 317)) ||
+        (d.displayName === 'National Driving License' && (d.originalFilename === 'Driving_License_Card.png' || d.size === 67))
+      )
+    );
+    if (this.db.documents.length !== initialDocCount) modified = true;
+
+    const initialLogCount = this.db.auditLogs.length;
+    this.db.auditLogs = this.db.auditLogs.filter(l =>
+      l.details !== 'Sample demo document created' &&
+      !['Official Travel Passport', 'National Driving License'].includes(l.documentName)
+    );
+    if (this.db.auditLogs.length !== initialLogCount) modified = true;
+
+    if (modified) {
+      this.saveDatabase();
+      console.log('🧹 Purged legacy sample documents and demo audit logs from database.');
+    }
   }
 
   initEmptyDatabase() {
@@ -147,9 +170,6 @@ class VaultService {
 
     this.saveDatabase();
     this.logAudit(uid, 'PIN_SET', null, 'SUCCESS', 'Security PIN configured', ip);
-
-    // Also auto-create initial sample demo documents if this user's vault is empty
-    this.seedSampleDocumentsIfEmpty(uid);
 
     return { success: true, message: 'Security PIN configured successfully.' };
   }
@@ -889,66 +909,7 @@ class VaultService {
   }
 
   seedSampleDocumentsIfEmpty(userId) {
-    const existing = this.db.documents.filter(d => d.userId === userId);
-    if (existing.length > 0) return;
-
-    try {
-      // Create sample Passport PDF file in storage
-      const passportFilename = `${crypto.randomBytes(16).toString('hex')}.pdf`;
-      const passportPath = path.join(this.storageDir, passportFilename);
-      const samplePdfContent = Buffer.from(
-        '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
-        '3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n' +
-        '0000000000 65535 f \n0000000010 00000 n \n0000000053 00000 n \n0000000102 00000 n \n' +
-        'trailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF\n'
-      );
-      fs.writeFileSync(passportPath, samplePdfContent);
-
-      // Create sample Driving License PNG file
-      const licenseFilename = `${crypto.randomBytes(16).toString('hex')}.png`;
-      const licensePath = path.join(this.storageDir, licenseFilename);
-      const samplePngContent = Buffer.from([
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG Signature
-        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 pixel
-        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89,
-        0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, // IDAT chunk
-        0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4,
-        0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82 // IEND
-      ]);
-      fs.writeFileSync(licensePath, samplePngContent);
-
-      // Add to database
-      this.db.documents.push({
-        id: `doc_${crypto.randomBytes(8).toString('hex')}`,
-        userId,
-        type: 'Passport',
-        displayName: 'Official Travel Passport',
-        originalFilename: 'Passport_Gov_India.pdf',
-        storedFilename: passportFilename,
-        mimeType: 'application/pdf',
-        size: samplePdfContent.length,
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-      });
-
-      this.db.documents.push({
-        id: `doc_${crypto.randomBytes(8).toString('hex')}`,
-        userId,
-        type: 'Driving License',
-        displayName: 'National Driving License',
-        originalFilename: 'Driving_License_Card.png',
-        storedFilename: licenseFilename,
-        mimeType: 'image/png',
-        size: samplePngContent.length,
-        createdAt: new Date(Date.now() - 1800000).toISOString(),
-      });
-
-      this.saveDatabase();
-      this.logAudit(userId, 'DOCUMENT_UPLOADED', 'Official Travel Passport', 'SUCCESS', 'Sample demo document created');
-      this.logAudit(userId, 'DOCUMENT_UPLOADED', 'National Driving License', 'SUCCESS', 'Sample demo document created');
-    } catch (err) {
-      console.warn('Could not seed sample documents:', err.message);
-    }
+    // No-op: new user vaults start clean with 0 documents
   }
 }
 
