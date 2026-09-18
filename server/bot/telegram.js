@@ -5,20 +5,19 @@ const PDFItineraryGenerator = require('../services/pdfGenerator');
 const WeatherService = require('../services/weather');
 
 class TripBot {
-  constructor(token, dataService, llmService) {
-    if (!token) {
+  constructor(token, dataService, llmService, vaultService = null) {
+    this.dataService = dataService;
+    this.llmService = llmService;
+    this.vaultService = vaultService;
+    this.sessions = new Map();
+
+    if (!token || token === 'your_telegram_bot_token_here' || token.startsWith('your_')) {
       console.log('⚠️  No Telegram bot token provided. Bot will not start.');
       this.bot = null;
       return;
     }
 
     this.bot = new TelegramBot(token, { polling: true });
-    this.dataService = dataService;
-    this.llmService = llmService;
-
-    // User session storage: chatId -> { state, booking, preferences, history, itinerary }
-    this.sessions = new Map();
-
     this.setupHandlers();
     console.log('🤖 Telegram Bot started!');
   }
@@ -26,13 +25,24 @@ class TripBot {
   setupHandlers() {
     if (!this.bot) return;
 
-    // /start command — entry point from booking
+    // /start command — entry point from booking or linking
     this.bot.onText(/\/start\s*(.*)/, async (msg, match) => {
       const chatId = msg.chat.id;
-      const bookingId = match[1]?.trim();
+      const param = match[1]?.trim();
 
-      if (bookingId) {
-        const booking = this.dataService.getBooking(bookingId);
+      // Check if deep link is account linking
+      if (param && param.startsWith('link_')) {
+        const code = param.replace('link_', '').trim();
+        if (this.vaultService) {
+          const res = this.vaultService.linkTelegramChat(chatId, code);
+          await this.bot.sendMessage(chatId, res.message);
+          await this.sendVaultMenu(chatId);
+          return;
+        }
+      }
+
+      if (param) {
+        const booking = this.dataService.getBooking(param);
         if (booking) {
           this.sessions.set(chatId, {
             state: 'onboarding_interests',
@@ -219,6 +229,22 @@ class TripBot {
           );
           return;
         }
+
+        // Vault help
+        if (data === 'vault_help') {
+          const frontendUrl = this.vaultService?.frontendBaseUrl || 'http://localhost:3000';
+          await this.bot.sendMessage(chatId,
+            `🛡️ *StayWU Document Vault Security Architecture*\n\n` +
+            `• *Zero Plaintext Storage:* Your PIN is hashed with cryptographically random salt & scrypt.\n` +
+            `• *No Telegram PINs:* Your PIN is *never* requested or typed into Telegram chats.\n` +
+            `• *Private Storage:* Travel documents are stored outside public directories with UUID filenames.\n` +
+            `• *Opaque QR Codes:* QR codes contain only random 256-bit tokens, no PII or direct document URLs.\n` +
+            `• *Temporary Shares:* Generate expiring, revocable shares for hotel check-ins or scooter rentals.\n\n` +
+            `Access your vault: [StayWU Document Vault](${frontendUrl}/documents)`,
+            { parse_mode: 'Markdown' }
+          );
+          return;
+        }
       } catch (err) {
         console.warn('Telegram callback_query error:', err.message);
       }
@@ -228,6 +254,33 @@ class TripBot {
     this.bot.on('message', async (msg) => {
       try {
         if (msg.text?.startsWith('/')) {
+          // Handle /document or /documents command
+          if (msg.text.match(/^\/(?:document|documents)(?:\s|$)/i)) {
+            await this.sendVaultMenu(msg.chat.id);
+            return;
+          }
+
+          // Handle /link command
+          if (msg.text.match(/^\/link(?:\s+(.*))?$/i)) {
+            const match = msg.text.match(/^\/link(?:\s+(.*))?$/i);
+            const code = match?.[1]?.trim();
+            if (!code) {
+              await this.bot.sendMessage(msg.chat.id,
+                'ℹ️ *Please provide your 6-character linking code from the StayWU website.*\n\nExample: `/link SW8K9Z`',
+                { parse_mode: 'Markdown' }
+              );
+              return;
+            }
+            if (this.vaultService) {
+              const res = this.vaultService.linkTelegramChat(msg.chat.id, code);
+              await this.bot.sendMessage(msg.chat.id, res.message);
+              if (res.success) {
+                await this.sendVaultMenu(msg.chat.id);
+              }
+            }
+            return;
+          }
+
           // Handle /skip command
           if (msg.text === '/skip') {
             const session = this.sessions.get(msg.chat.id);
@@ -251,7 +304,9 @@ class TripBot {
           if (msg.text === '/help') {
             await this.bot.sendMessage(msg.chat.id,
               `📋 *StayWU Trip Concierge Commands:*\n\n` +
-              `/plan — Generate a new itinerary\n` +
+              `/document — Access your Secure Document Vault\n` +
+              `/link <code> — Connect your Telegram account to StayWU Vault\n` +
+              `/plan — Generate a new trip itinerary\n` +
               `/pdf — Download your itinerary as PDF\n` +
               `/help — Show this help message\n\n` +
               `Or just type any question about Goa! 🌴`,
@@ -259,7 +314,7 @@ class TripBot {
             );
             return;
           }
-          return; // Ignore other commands (including /start handled above)
+          return; // Ignore other commands
         }
 
         const chatId = msg.chat.id;
@@ -771,6 +826,48 @@ class TripBot {
       watersports: '🌊', wellness: '🧘', shopping: '🛍️', nature: '🌿',
     };
     return map[interest] || '✨';
+  }
+
+  // Telegram /document secure menu
+  async sendVaultMenu(chatId) {
+    const frontendUrl = this.vaultService?.frontendBaseUrl || 'http://localhost:3000';
+    const linkedUserId = this.vaultService?.getUserIdForTelegramChat(chatId);
+    const status = this.vaultService?.getVaultStatus(linkedUserId || 'traveler_default');
+
+    // Generate secure one-time vault link
+    const linkData = await this.vaultService?.generateTelegramVaultLink(chatId);
+    const secureVaultUrl = linkData?.targetUrl || `${frontendUrl}/documents`;
+
+    const statusBadge = linkedUserId
+      ? '🔗 *Connected Account:* Verified StayWU Traveler'
+      : 'ℹ️ *Account:* Demo Persona (Use `/link <code>` to link your account)';
+
+    await this.bot.sendMessage(chatId,
+      `🛡️ *StayWU Secure Document Vault*\n` +
+      `_Your documents. One secure vault. Available when you need them._\n\n` +
+      `${statusBadge}\n` +
+      `📁 *Protected Documents:* ${status?.totalDocuments || 0}\n` +
+      `🔐 *PIN Security:* ${status?.isPinSet ? 'Active ✓ (Encrypted)' : 'Setup Required'}\n` +
+      `📤 *Active Shares:* ${status?.activeSharesCount || 0}\n\n` +
+      `⚠️ *Zero-Trust Security:* Your PIN is *never* entered inside Telegram. Click below to securely unlock your vault on the StayWU website:`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🔐 Open Secure Vault (Enter PIN)', url: secureVaultUrl },
+            ],
+            [
+              { text: '📂 My Documents', url: `${frontendUrl}/documents` },
+              { text: '📤 Manage Sharing', url: `${frontendUrl}/documents#shares` },
+            ],
+            [
+              { text: '❓ Vault Help & Security', callback_data: 'vault_help' },
+            ],
+          ],
+        },
+      }
+    );
   }
 }
 

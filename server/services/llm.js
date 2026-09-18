@@ -2,12 +2,28 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 class LLMService {
   constructor(apiKey) {
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+    this.apiKey = apiKey;
+    if (apiKey && apiKey !== 'your_gemini_api_key_here' && !apiKey.startsWith('your_')) {
+      this.genAI = new GoogleGenerativeAI(apiKey);
+      const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+      this.model = this.genAI.getGenerativeModel({ model: modelName });
+    } else {
+      this.genAI = null;
+      this.model = null;
+    }
   }
 
   // Web chatbot — pre-booking trust advisor
   async chatPreBooking(userMessage, hotelContext, conversationHistory = []) {
+    if (!this.model) {
+      if (hotelContext && hotelContext.length > 0) {
+        const topHotels = hotelContext.slice(0, 3).map(h => 
+          `### 🏨 ${h.hotel_name || h.name}\n- 📍 **Location:** ${h.area || h.location || 'Goa'}\n- 🛡️ **Trust Score:** ${h.trust_score || 90}/100\n- 💰 **Price:** ₹${h.price_per_night || h.price || '2,500'}/night\n- 🌴 **Vibe:** Verified quality stay in ${h.location || 'Goa'}`
+        ).join('\n\n');
+        return `Hello! I am your StayWU AI Trust Advisor. Here are some top verified hotels in Goa:\n\n${topHotels}\n\n💡 *Tip: Add your \`GEMINI_API_KEY\` to \`server/.env\` for full conversational AI recommendations.*`;
+      }
+      return "Hello! I am your StayWU AI Trust Advisor. Add your `GEMINI_API_KEY` to `server/.env` to enable full conversational trip planning.";
+    }
     const systemPrompt = `You are StayWU's Trust Advisor — an AI assistant helping travelers find safe, trustworthy, and verified hotels in Goa, India.
 
 Your role:

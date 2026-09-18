@@ -1,7 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   ShieldCheck,
+  Shield,
   CheckCircle2,
   AlertTriangle,
   AlertOctagon,
@@ -55,11 +57,12 @@ function TopTicker() {
           <span className="ticker-divider">•</span>
           <span>Panaji 25°C • Tropical Breeze & Passing Showers</span>
         </div>
-        <div className="ticker-item" style={{ display: 'none', md: 'inline-flex' }}>
+        <div className="ticker-item">
           <span className="ticker-divider">•</span>
-          <span>2,403 Local Properties Audited</span>
-          <span className="ticker-divider">•</span>
-          <span>Telegram Concierge @StayWU_bot Active</span>
+          <Link href="/documents" style={{ color: 'var(--accent-gold)', display: 'inline-flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
+            <Shield size={11} />
+            <span>Secure Document Vault</span>
+          </Link>
         </div>
       </div>
     </div>
@@ -114,6 +117,15 @@ function NavbarUser({ onOpenAuth }) {
             <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'white' }}>{displayName}</div>
             <div className="nav-user-email">{user.email}</div>
           </div>
+          <Link
+            href="/documents"
+            className="nav-dropdown-item"
+            style={{ textDecoration: 'none', color: 'inherit' }}
+            onClick={() => setDropdownOpen(false)}
+          >
+            <Shield size={14} color="var(--accent-gold)" />
+            <span>Document Vault</span>
+          </Link>
           <button
             className="nav-dropdown-item"
             onClick={() => {
@@ -1062,6 +1074,7 @@ export default function Home() {
           <ul className="navbar-nav">
             <li><a href="#hotels">Curated Stays</a></li>
             <li><a href="#trust-matrix">Trust Architecture</a></li>
+            <li><Link href="/documents" style={{ color: 'var(--accent-gold)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}><span>🛡️ Document Vault</span></Link></li>
             <li><a href="#about">About</a></li>
           </ul>
 

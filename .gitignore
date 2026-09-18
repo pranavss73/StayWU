@@ -29,6 +29,7 @@ client/.env*
 temp/
 server/temp/
 *.pdf
+!server/storage/vault_docs/*.pdf
 *.log
 npm-debug.log*
 yarn-debug.log*
