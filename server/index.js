@@ -63,8 +63,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 StayWU Server running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🚀 StayWU Server running on port ${PORT}`);
   console.log(`📊 ${dataService.hotels.length} hotels | ${dataService.places.length} places loaded`);
   console.log(`🤖 Telegram Bot: ${tripBot.bot ? 'Active' : 'Not configured (add TELEGRAM_BOT_TOKEN to .env)'}`);
   console.log(`🧠 Gemini AI: ${process.env.GEMINI_API_KEY ? 'Configured' : 'Not configured'}\n`);
