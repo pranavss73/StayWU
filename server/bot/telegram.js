@@ -42,7 +42,9 @@ class TripBot {
         { command: 'plan', description: 'Generate a personalized Goa travel itinerary' },
         { command: 'pdf', description: 'Download trip itinerary and vouchers as PDF' },
         { command: 'memory', description: 'Create your 5-photo Trip Memory Dump' },
-        { command: 'memorynow', description: 'Generate your Memory Dump now (demo)' },
+        { command: 'memorynow', description: 'Generate your Memory Dump now' },
+        { command: 'demo', description: '⚡ 1-Tap Demo Memory Dump (presentation mode)' },
+        { command: 'sos', description: '🚨 Emergency helplines, nearest Goa hospitals & police' },
         { command: 'help', description: 'Show concierge commands and guide' },
       ]);
     } catch (err) {
@@ -369,6 +371,18 @@ class TripBot {
             return;
           }
 
+          // Handle /demo or /demomemory command (1-Tap Presentation Demo)
+          if (msg.text.match(/^\/(?:demo|demomemory)(?:@\w+)?(?:\s|$)/i)) {
+            await this.handleDemoMemoryDump(msg.chat.id);
+            return;
+          }
+
+          // Handle /sos command (Emergency & Police SOS)
+          if (msg.text.match(/^\/sos(?:@\w+)?(?:\s|$)/i)) {
+            await this.sendEmergencySOS(msg.chat.id);
+            return;
+          }
+
           // Handle /help command
           if (msg.text.match(/^\/help(?:@\w+)?(?:\s|$)/i)) {
             await this.bot.sendMessage(msg.chat.id,
@@ -378,7 +392,9 @@ class TripBot {
               `/plan — Generate a new personalized itinerary\n` +
               `/pdf — Download your itinerary and vouchers as PDF\n` +
               `/memory — Collect 5 photos for your Trip Memory Dump\n` +
-              `/memorynow — Generate the dump immediately (demo)\n` +
+              `/memorynow — Generate the dump immediately\n` +
+              `/demo — ⚡ 1-Tap Demo Memory Dump (presentation mode)\n` +
+              `/sos — 🚨 Emergency helplines, nearest Goa hospitals & police\n` +
               `/help — Show this help message\n\n` +
               `Or just type any question about Goa! 🌴`,
               { parse_mode: 'Markdown' }
@@ -626,6 +642,130 @@ class TripBot {
       await this.bot.sendMessage(chatId,
         '❌ I could not create the Memory Dump this time. Please try /memorynow again.'
       );
+    }
+  }
+
+  async sendEmergencySOS(chatId) {
+    const session = this.sessions.get(chatId);
+    const location = session?.booking?.location || 'Goa';
+    const isSouthGoa = /margao|colva|benaulim|palolem|cavelossim|agonda|canacona/i.test(location);
+
+    const sosMessage =
+      `🚨 *STAYWU TRAVELER EMERGENCY & SOS CONCIERGE* 🚨\n` +
+      `_24/7 Verified Emergency Infrastructure for Goa_\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🚨 *IMMEDIATE HELPLINES (TAP TO CALL):*\n` +
+      `• 👮 *Central Police Emergency:* [112](tel:112)\n` +
+      `• 🏖️ *Goa Tourist Police Hotline:* [+91 832 242 8473](tel:+918322428473)\n` +
+      `• 🚑 *Medical Ambulance Service:* [108](tel:108)\n` +
+      `• 🛡️ *Women Safety Helpline:* [1091](tel:1091)\n` +
+      `• 🌊 *Coastal & Marine Police:* [1093](tel:1093)\n` +
+      `• 🚒 *Fire & Rescue:* [101](tel:101)\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🏥 *NEAREST 24/7 HOSPITALS (${isSouthGoa ? 'SOUTH GOA' : 'NORTH GOA'}):*\n` +
+      (isSouthGoa
+        ? `• *South Goa District Hospital* (Margao) — 24/7 Emergency & Trauma\n• *Apollo Victor Hospital* (Malbhat, Margao) — Multi-speciality ICU`
+        : `• *Goa Medical College & Hospital (GMC)* (Bambolim) — Premier Tertiary Care\n• *North Goa District Hospital* (Mapusa) — 24/7 Casualty\n• *Manipal Hospital* (Dona Paula) — Private Emergency Care`
+      ) + `\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🛵 *GOA POLICE CHECKPOINT & RENTAL SCAM PROTOCOL:*\n` +
+      `1. *Required Documents:* Driving License, RC, Insurance & Helmet for both riders.\n` +
+      `2. *Zero-Trust ID:* *Never* surrender physical Passport or Aadhaar to private scooter vendors. Use your StayWU 15-Minute Expiring Vault QR instead!\n` +
+      `3. *Traffic Fine Receipt:* Always demand an official e-challan SMS/printout if fined.`;
+
+    const keyboard = [
+      [
+        { text: '📞 Call Tourist Police', url: 'tel:+918322428473' },
+        { text: '🚑 Call Ambulance 108', url: 'tel:108' },
+      ],
+      [
+        { text: '🛡️ Open Secure Document Vault', callback_data: 'vault_refresh' },
+      ]
+    ];
+
+    await this.bot.sendMessage(chatId, sosMessage, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: keyboard },
+    });
+  }
+
+  async handleDemoMemoryDump(chatId) {
+    await this.bot.sendMessage(chatId, '⚡ *1-Tap Demo Mode:* Loading 5 curated Goa memories from `demo_images`... ✨', { parse_mode: 'Markdown' });
+
+    try {
+      const rootDir = path.join(__dirname, '..', '..');
+      let demoDir = path.join(rootDir, 'demo_images');
+      if (!fs.existsSync(demoDir)) {
+        demoDir = path.join(__dirname, '..', 'demo_images');
+      }
+
+      if (!fs.existsSync(demoDir)) {
+        await this.bot.sendMessage(chatId, '⚠️ `demo_images` directory not found on server.');
+        return;
+      }
+
+      const files = fs.readdirSync(demoDir).filter(f => /\.(jpe?g|png|webp)$/i.test(f));
+      if (files.length < 5) {
+        await this.bot.sendMessage(chatId, `⚠️ Need 5 images in demo_images (found ${files.length}).`);
+        return;
+      }
+
+      const captions = [
+        { place: 'Chapora Fort', dateLabel: '20 Sep 2026' },
+        { place: 'Anjuna Flea Market', dateLabel: '21 Sep 2026' },
+        { place: 'Curlies Beach Shack', dateLabel: '22 Sep 2026' },
+        { place: 'Fontainhas Latin Quarter', dateLabel: '23 Sep 2026' },
+        { place: 'Vagator Sunset Point', dateLabel: '24 Sep 2026' }
+      ];
+
+      const photos = files.slice(0, 5).map((f, i) => ({
+        filePath: path.join(demoDir, f),
+        place: captions[i].place,
+        dateLabel: captions[i].dateLabel
+      }));
+
+      const session = this.sessions.get(chatId) || {};
+      const booking = session.booking || {
+        location: 'North Goa',
+        checkIn: '20 Sep 2026',
+        checkOut: '25 Sep 2026',
+        guestName: 'Pranav'
+      };
+
+      let caption = 'Chasing sunsets and salty breezes.';
+      try {
+        if (this.llmService) {
+          caption = await this.llmService.generateMemoryCaption(booking, photos);
+        }
+      } catch (err) {
+        console.warn('Demo AI caption fallback:', err.message);
+      }
+
+      const result = await this.memoryDumpService.createMemoryDump({
+        chatId: String(chatId),
+        booking,
+        photos,
+        caption
+      });
+
+      if (result.pngPath && fs.existsSync(result.pngPath)) {
+        await this.bot.sendPhoto(chatId, result.pngPath, {
+          caption: `🌴 *StayWU Demo Memory Dump (1-Tap Presentation)*\n\n1080 × 1920 • WhatsApp Status & Instagram Story ready\n\n_"${caption}"_`,
+          parse_mode: 'Markdown'
+        });
+        await this.bot.sendDocument(chatId, result.pngPath, {
+          caption: `📥 Download original uncompressed 1080×1920 Story PNG.\n\n#StayWU #GoaTrip #MemoryDump`
+        });
+      } else {
+        await this.bot.sendDocument(chatId, result.svgPath, {
+          caption: `📥 Demo Memory Dump SVG ready.`
+        });
+      }
+
+      await this.bot.sendMessage(chatId, '*Demo Memory Dump created successfully!.* You can also view it on our website.', { parse_mode: 'Markdown' });
+    } catch (err) {
+      console.error('Demo error:', err);
+      await this.bot.sendMessage(chatId, `❌ Demo failed: ${err.message}`);
     }
   }
 

@@ -1,0 +1,75 @@
+[
+  {
+    "id": "BK-GOA-8619",
+    "userId": "traveler_default",
+    "hotelId": 2,
+    "hotelName": "Elements by Rosetta",
+    "location": "South Goa",
+    "area": "South Goa",
+    "price": 13494,
+    "price_display": "₹13,494",
+    "trust_score": 99,
+    "trust_badge": "trusted",
+    "guestName": "Pranav",
+    "guestEmail": "pranav@staywu.com",
+    "phoneNumber": "+91 98765 43210",
+    "checkIn": "2026-09-22",
+    "checkOut": "2026-09-26",
+    "createdAt": "2026-09-20T10:30:00.000Z",
+    "status": "confirmed",
+    "itinerary": "North Goa Sunset & Heritage Tour",
+    "preferences": {
+      "interests": [
+        "Beaches",
+        "Nightlife",
+        "Seafood"
+      ],
+      "pace": "balanced"
+    }
+  },
+  {
+    "id": "BK-GOA-1370",
+    "userId": "traveler_default",
+    "hotelId": 1,
+    "hotelName": "Park Inn by Radisson Goa Candolim",
+    "location": "Candolim",
+    "area": "North Goa",
+    "price": 6192,
+    "price_display": "₹6,192",
+    "trust_score": 93,
+    "trust_badge": "trusted",
+    "guestName": "Pranav",
+    "guestEmail": "pranav@staywu.com",
+    "phoneNumber": "+91 98765 43210",
+    "checkIn": "2026-08-14",
+    "checkOut": "2026-08-18",
+    "createdAt": "2026-08-10T14:15:00.000Z",
+    "status": "completed",
+    "itinerary": "Monsoon Coastline & Shack Crawl",
+    "preferences": {
+      "interests": [
+        "Water Sports",
+        "Sunset Points"
+      ],
+      "pace": "relaxed"
+    }
+  },
+  {
+    "id": "BKMUAC0A3JSUU",
+    "userId": "traveler_default",
+    "hotelId": 1,
+    "hotelName": "Park Inn by Radisson Goa Candolim",
+    "location": "Candolim",
+    "area": "North Goa",
+    "price": 6192,
+    "guestName": "Pranav",
+    "guestEmail": "pranav@staywu.com",
+    "phoneNumber": "+91 98765 43210",
+    "checkIn": "2026-09-24",
+    "checkOut": "2026-09-28",
+    "createdAt": "2026-09-20T21:31:50.431Z",
+    "status": "confirmed",
+    "itinerary": null,
+    "preferences": null
+  }
+]

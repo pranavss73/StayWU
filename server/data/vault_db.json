@@ -219,6 +219,76 @@
   ],
   "auditLogs": [
     {
+      "id": "log_6b109eb0fd4d",
+      "timestamp": "2026-09-20T21:32:47.313Z",
+      "userId": "OLmyKQGQn1bF8TIKfZpPAC8IKva2",
+      "action": "VAULT_UNLOCKED",
+      "documentName": "—",
+      "status": "SUCCESS",
+      "details": "Vault unlocked via PIN",
+      "ip": "127.0.0.1"
+    },
+    {
+      "id": "log_7e0a6cec423d",
+      "timestamp": "2026-09-20T21:32:44.264Z",
+      "userId": "OLmyKQGQn1bF8TIKfZpPAC8IKva2",
+      "action": "VAULT_UNLOCKED",
+      "documentName": "—",
+      "status": "SUCCESS",
+      "details": "Vault unlocked via PIN",
+      "ip": "127.0.0.1"
+    },
+    {
+      "id": "log_18cf9d084f2a",
+      "timestamp": "2026-09-20T20:45:50.918Z",
+      "userId": "traveler_default",
+      "action": "LOCKOUT_TRIGGERED",
+      "documentName": "—",
+      "status": "LOCKED",
+      "details": "5 failed attempts, locked for 5 minutes",
+      "ip": "127.0.0.1"
+    },
+    {
+      "id": "log_003bc28ef420",
+      "timestamp": "2026-09-20T20:45:37.787Z",
+      "userId": "traveler_default",
+      "action": "PIN_FAILED",
+      "documentName": "—",
+      "status": "FAILED",
+      "details": "Incorrect PIN attempt (4/5)",
+      "ip": "127.0.0.1"
+    },
+    {
+      "id": "log_d2d12bd771c6",
+      "timestamp": "2026-09-20T20:44:11.003Z",
+      "userId": "traveler_default",
+      "action": "PIN_FAILED",
+      "documentName": "—",
+      "status": "FAILED",
+      "details": "Incorrect PIN attempt (3/5)",
+      "ip": "127.0.0.1"
+    },
+    {
+      "id": "log_7ae58aee3a13",
+      "timestamp": "2026-09-20T20:43:21.716Z",
+      "userId": "traveler_default",
+      "action": "PIN_FAILED",
+      "documentName": "—",
+      "status": "FAILED",
+      "details": "Incorrect PIN attempt (2/5)",
+      "ip": "127.0.0.1"
+    },
+    {
+      "id": "log_274fcf0abd5e",
+      "timestamp": "2026-09-20T20:42:28.180Z",
+      "userId": "traveler_default",
+      "action": "PIN_FAILED",
+      "documentName": "—",
+      "status": "FAILED",
+      "details": "Incorrect PIN attempt (1/5)",
+      "ip": "127.0.0.1"
+    },
+    {
       "id": "log_18eeeb9769eb",
       "timestamp": "2026-09-18T13:15:58.362Z",
       "userId": "OLmyKQGQn1bF8TIKfZpPAC8IKva2",

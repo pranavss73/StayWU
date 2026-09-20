@@ -34,11 +34,15 @@ import {
   Loader2,
   FileCheck,
   UserCheck,
-  ShieldAlert
+  ShieldAlert,
+  Camera,
+  PhoneCall,
+  HeartPulse,
+  LifeBuoy
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import AuthModal from '../../components/AuthModal';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, BACKEND_URL } from '@/lib/api';
 
 const DOCUMENT_CATEGORIES = [
   { id: 'All', label: 'All Documents' },
@@ -67,7 +71,9 @@ export default function DocumentVaultPage() {
   const [documents, setDocuments] = useState([]);
   const [activeShares, setActiveShares] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
-  const [activeTab, setActiveTab] = useState('documents'); // 'documents' | 'shares' | 'logs'
+  const [memoriesData, setMemoriesData] = useState(null);
+  const [generatingDemoMemory, setGeneratingDemoMemory] = useState(false);
+  const [activeTab, setActiveTab] = useState('documents'); // 'documents' | 'shares' | 'logs' | 'memories' | 'sos'
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   // Modals & Panels
@@ -224,6 +230,50 @@ export default function DocumentVaultPage() {
       }
     } catch (err) {
       console.error('Error fetching audit logs:', err);
+    }
+  };
+
+  const fetchMemories = async () => {
+    try {
+      const res = await fetch(`${API_BASE.replace(/\/api$/, '')}/api/memories/latest?chatId=demo_user`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.available) {
+          setMemoriesData(data);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch memories:', err);
+    }
+  };
+
+  const handleGenerateDemoMemory = async () => {
+    setGeneratingDemoMemory(true);
+    try {
+      const res = await fetch(`${API_BASE.replace(/\/api$/, '')}/api/memories/demo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestName: user?.displayName || 'Pranav & Friends' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMemoriesData({
+          available: true,
+          pngUrl: data.pngUrl,
+          svgUrl: data.svgUrl,
+          caption: data.caption,
+          photos: data.photos,
+          booking: data.booking,
+        });
+        showToast('✨ 1-Tap Presentation Demo Story generated!');
+      } else {
+        const err = await res.json();
+        showToast(err.error || 'Failed to generate demo story.', 'error');
+      }
+    } catch (err) {
+      showToast('Connection error generating memory dump.', 'error');
+    } finally {
+      setGeneratingDemoMemory(false);
     }
   };
 
@@ -769,6 +819,25 @@ export default function DocumentVaultPage() {
               <Clock size={15} />
               <span>Access History ({auditLogs.length})</span>
             </button>
+
+            <button
+              className={`vault-tab-btn ${activeTab === 'memories' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('memories');
+                fetchMemories();
+              }}
+            >
+              <Camera size={15} color="var(--accent-gold)" />
+              <span>Trip Memories (Story)</span>
+            </button>
+
+            <button
+              className={`vault-tab-btn ${activeTab === 'sos' ? 'active' : ''}`}
+              onClick={() => setActiveTab('sos')}
+            >
+              <HeartPulse size={15} color="#fb7185" />
+              <span style={{ color: '#fb7185' }}>Goa SOS & Emergency</span>
+            </button>
           </div>
 
           <div className="vault-quick-meta">
@@ -1038,13 +1107,302 @@ export default function DocumentVaultPage() {
             )}
           </div>
         )}
+
+        {/* Tab 4: Trip Memories & 1-Tap Demo Mode */}
+        {activeTab === 'memories' && (
+          <div className="vault-tab-content memories-tab-panel">
+            <div className="memories-hero-banner">
+              <div className="memories-hero-info">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent-gold)', marginBottom: 4 }}>
+                  <Sparkles size={16} />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>StayWU Story Engine</span>
+                </div>
+                <h3>AI Trip Memory Dump & Scrapbook</h3>
+                <p>
+                  Collect 5 moments during your trip on Telegram. StayWU automatically arranges them into a social-ready 9:16 vertical scrapbook with AI captions.
+                </p>
+              </div>
+
+              <button
+                className="btn-demo-trigger"
+                onClick={handleGenerateDemoMemory}
+                disabled={generatingDemoMemory}
+              >
+                {generatingDemoMemory ? (
+                  <>
+                    <Loader2 size={16} className="spin-icon" />
+                    <span>Rendering 1080×1920 Story...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} />
+                    <span> 1-Tap Presentation Demo</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {memoriesData?.available ? (
+              <div className="memories-showcase-layout">
+                <div className="memory-story-frame">
+                  <img
+                    src={memoriesData.pngUrl ? `${BACKEND_URL}${memoriesData.pngUrl}` : `${BACKEND_URL}${memoriesData.svgUrl}`}
+                    alt="StayWU Trip Memory Dump"
+                    className="memory-story-img"
+                  />
+                </div>
+
+                <div className="memory-details-card">
+                  <div className="memory-details-header">
+                    <div className="memory-details-title">Generated Story Details</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                      1080 × 1920 px • Formatted for WhatsApp Status & Instagram Stories
+                    </div>
+                    {memoriesData.caption && (
+                      <div className="memory-caption-quote">
+                        "{memoriesData.caption}"
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Places & Moments Captured:
+                    </div>
+                    <div className="memory-places-list">
+                      {(memoriesData.photos || [
+                        { place: 'Chapora Fort', dateLabel: '12 Sep 2026' },
+                        { place: 'Anjuna Flea Market', dateLabel: '13 Sep 2026' },
+                        { place: 'Curlies Beach Shack', dateLabel: '14 Sep 2026' },
+                        { place: 'Fontainhas Latin Quarter', dateLabel: '15 Sep 2026' },
+                        { place: 'Vagator Sunset Point', dateLabel: '16 Sep 2026' },
+                      ]).map((item, idx) => (
+                        <div key={idx} className="memory-place-item">
+                          <span className="memory-place-name">
+                            <span style={{ color: 'var(--accent-gold)' }}>📍</span>
+                            <span>{item.place}</span>
+                          </span>
+                          <span className="memory-place-date">{item.dateLabel}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="memory-actions-row">
+                    {memoriesData.pngUrl && (
+                      <a
+                        href={`${BACKEND_URL}${memoriesData.pngUrl}`}
+                        download="StayWU_Trip_Story.png"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-memory-download"
+                      >
+                        <Download size={14} />
+                        <span>Download Story PNG</span>
+                      </a>
+                    )}
+                    {memoriesData.svgUrl && (
+                      <a
+                        href={`${BACKEND_URL}${memoriesData.svgUrl}`}
+                        download="StayWU_Trip_Story.svg"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-memory-download"
+                      >
+                        <ExternalLink size={14} />
+                        <span>Open Vector SVG</span>
+                      </a>
+                    )}
+                    <button
+                      className="btn-memory-download"
+                      onClick={handleGenerateDemoMemory}
+                      disabled={generatingDemoMemory}
+                    >
+                      <RefreshCw size={14} />
+                      <span>Regenerate Demo</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="vault-empty-state">
+                <Camera size={44} color="var(--text-muted)" />
+                <h3>No Memory Dump Generated Yet</h3>
+                <p>
+                  Send 5 photos to <strong>@StayWU_bot</strong> on Telegram, or click <strong>⚡ 1-Tap Presentation Demo</strong> above to generate a live showcase instantly using your demo photos!
+                </p>
+                <div style={{ marginTop: 14 }}>
+                  <button
+                    className="btn-demo-trigger"
+                    onClick={handleGenerateDemoMemory}
+                    disabled={generatingDemoMemory}
+                  >
+                    <Sparkles size={15} />
+                    <span> Generate 1-Tap Demo Memory Dump Now</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 5: Goa Traveler SOS & Emergency Dashboard */}
+        {activeTab === 'sos' && (
+          <div className="vault-tab-content sos-tab-panel">
+            <div className="sos-alert-banner">
+              <div>
+                <div className="sos-alert-title">
+                  <ShieldAlert size={22} />
+                  <span>StayWU 24/7 Traveler Emergency Shield (Goa)</span>
+                </div>
+                <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                  Official verified police, hospital, and tourist protection hotlines with zero cell data requirement.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <a href="tel:112" className="vault-btn-primary" style={{ background: '#f43f5e', borderColor: '#f43f5e', textDecoration: 'none' }}>
+                  <PhoneCall size={15} />
+                  <span>Call 112 (Police)</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Helplines Grid */}
+            <div className="sos-helplines-grid">
+              <a href="tel:+918322428473" className="sos-phone-card">
+                <div className="sos-phone-info">
+                  <h4>Goa Tourist Police</h4>
+                  <p>Harassment, scams & visitor security</p>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--accent-gold)', marginTop: 4, fontWeight: 700 }}>+91 832 242 8473</div>
+                </div>
+                <div className="sos-phone-dial">
+                  <PhoneCall size={16} />
+                </div>
+              </a>
+
+              <a href="tel:108" className="sos-phone-card">
+                <div className="sos-phone-info">
+                  <h4>Medical Ambulance (108)</h4>
+                  <p>24/7 Free emergency medical response</p>
+                  <div style={{ fontSize: '0.82rem', color: '#34d399', marginTop: 4, fontWeight: 700 }}>Dial 108</div>
+                </div>
+                <div className="sos-phone-dial" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>
+                  <PhoneCall size={16} />
+                </div>
+              </a>
+
+              <a href="tel:1091" className="sos-phone-card">
+                <div className="sos-phone-info">
+                  <h4>Women Safety Helpline (1091)</h4>
+                  <p>Dedicated Goa Police women protection cell</p>
+                  <div style={{ fontSize: '0.82rem', color: '#fb7185', marginTop: 4, fontWeight: 700 }}>Dial 1091</div>
+                </div>
+                <div className="sos-phone-dial">
+                  <PhoneCall size={16} />
+                </div>
+              </a>
+
+              <a href="tel:1093" className="sos-phone-card">
+                <div className="sos-phone-info">
+                  <h4>Coastal Marine Police (1093)</h4>
+                  <p>Beach safety, sea rescue & drowning alerts</p>
+                  <div style={{ fontSize: '0.82rem', color: '#38bdf8', marginTop: 4, fontWeight: 700 }}>Dial 1093</div>
+                </div>
+                <div className="sos-phone-dial" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                  <PhoneCall size={16} />
+                </div>
+              </a>
+
+              <a href="tel:101" className="sos-phone-card">
+                <div className="sos-phone-info">
+                  <h4>Fire & Disaster Response</h4>
+                  <p>Emergency rescue & fire services</p>
+                  <div style={{ fontSize: '0.82rem', color: '#f59e0b', marginTop: 4, fontWeight: 700 }}>Dial 101</div>
+                </div>
+                <div className="sos-phone-dial" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
+                  <PhoneCall size={16} />
+                </div>
+              </a>
+
+              <div className="sos-phone-card" style={{ cursor: 'default' }}>
+                <div className="sos-phone-info">
+                  <h4>StayWU Telegram SOS</h4>
+                  <p>Type /sos anytime on @StayWU_bot</p>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--accent-gold)', marginTop: 4, fontWeight: 700 }}>/sos Command Active</div>
+                </div>
+                <div className="sos-phone-dial" style={{ background: 'rgba(226, 183, 116, 0.15)', color: 'var(--accent-gold)' }}>
+                  <Bot size={16} />
+                </div>
+              </div>
+            </div>
+
+            {/* Hospitals by Region */}
+            <div className="sos-hospitals-section">
+              <div className="sos-hospital-card">
+                <div className="sos-hospital-header">
+                  <Building2 size={16} />
+                  <span>North Goa 24/7 Trauma Hospitals</span>
+                </div>
+                <div className="sos-hospital-item">
+                  <div className="sos-hospital-name">Goa Medical College & Hospital (GMC)</div>
+                  <div className="sos-hospital-type">Bambolim • Premier Tertiary Care, Multi-Specialty Trauma & ICU</div>
+                </div>
+                <div className="sos-hospital-item">
+                  <div className="sos-hospital-name">North Goa District Hospital</div>
+                  <div className="sos-hospital-type">Mapusa • 24/7 Casualty, Emergency & Pharmacy</div>
+                </div>
+                <div className="sos-hospital-item">
+                  <div className="sos-hospital-name">Manipal Hospital</div>
+                  <div className="sos-hospital-type">Dona Paula, Panaji • Private Comprehensive Emergency</div>
+                </div>
+              </div>
+
+              <div className="sos-hospital-card">
+                <div className="sos-hospital-header">
+                  <Building2 size={16} />
+                  <span>South Goa 24/7 Trauma Hospitals</span>
+                </div>
+                <div className="sos-hospital-item">
+                  <div className="sos-hospital-name">South Goa District Hospital</div>
+                  <div className="sos-hospital-type">Margao • 24/7 Emergency Wing, Blood Bank & Trauma</div>
+                </div>
+                <div className="sos-hospital-item">
+                  <div className="sos-hospital-name">Apollo Victor Hospital</div>
+                  <div className="sos-hospital-type">Malbhat, Margao • Multi-Specialty Critical Care ICU</div>
+                </div>
+                <div className="sos-hospital-item">
+                  <div className="sos-hospital-name">Sub-District Hospital Ponda</div>
+                  <div className="sos-hospital-type">Ponda • Emergency Care & Triage</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Scooter Checkpoint & ID Scam Protocol */}
+            <div className="scooter-rights-box">
+              <ShieldCheck size={28} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--text-heading)', marginBottom: 4 }}>
+                  Goa Scooter Rental & Police Checkpoint Protocol
+                </div>
+                <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  1. <strong>Zero-Trust Identity:</strong> Never surrender physical passport or Aadhaar card to private scooter rental vendors. Use your <strong>StayWU 15-Minute Expiring Share QR</strong>.
+                  <br />
+                  2. <strong>Legal Checkpoint Powers:</strong> Traffic police can only ask to inspect: Driving License, Registration (RC), Insurance, and PUC. Both rider and pillion must wear helmets.
+                  <br />
+                  3. <strong>E-Challan Requirement:</strong> Cash demands without an official SMS receipt from Goa Police are unauthorized. Always ask for an e-challan.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* ======================================================== */}
       {/* MODAL 1: PIN Setup / Unlock / Change */}
       {/* ======================================================== */}
       {showPinModal && (
-        <div className="vault-modal-overlay">
+        <div className="vault-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowPinModal(false); }}>
           <div className="vault-modal-card">
             <div className="vault-modal-header">
               <div className="vault-modal-title-group">
@@ -1064,11 +1422,9 @@ export default function DocumentVaultPage() {
                   </p>
                 </div>
               </div>
-              {sessionToken && (
-                <button className="vault-modal-close-btn" onClick={() => setShowPinModal(false)}>
-                  <X size={18} />
-                </button>
-              )}
+              <button className="vault-modal-close-btn" onClick={() => setShowPinModal(false)} title="Close (Enter PIN later)">
+                <X size={18} />
+              </button>
             </div>
 
             <form onSubmit={handlePinSubmit} className="vault-pin-form">
@@ -1141,6 +1497,27 @@ export default function DocumentVaultPage() {
                     {pinMode === 'unlock' && 'Unlock Vault'}
                     {pinMode === 'change' && 'Update PIN'}
                   </span>
+                </button>
+              </div>
+
+              <div style={{ textAlign: 'center', marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPinModal(false);
+                    setActiveTab('memories');
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--accent-gold)',
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    padding: '4px 8px',
+                  }}
+                >
+                  Skip PIN & Explore Trip Memories / SOS Helplines &rarr;
                 </button>
               </div>
             </form>

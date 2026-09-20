@@ -17,10 +17,99 @@ class DataService {
       fs.readFileSync(path.join(dataDir, 'hotels-summary.json'), 'utf-8')
     );
     
-    // In-memory bookings store
+    // In-memory & file-backed bookings store
+    this.bookingsFilePath = path.join(__dirname, '..', 'data', 'bookings.json');
     this.bookings = new Map();
+    this.loadBookings();
     
-    console.log(`DataService loaded: ${this.hotels.length} hotels, ${this.places.length} places`);
+    console.log(`DataService loaded: ${this.hotels.length} hotels, ${this.places.length} places, ${this.bookings.size} bookings`);
+  }
+
+  loadBookings() {
+    try {
+      if (fs.existsSync(this.bookingsFilePath)) {
+        const raw = fs.readFileSync(this.bookingsFilePath, 'utf-8');
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          list.forEach(b => this.bookings.set(b.id, b));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load bookings from disk:', err.message);
+    }
+
+    // If empty, seed realistic default bookings for hackathon demo
+    if (this.bookings.size === 0) {
+      this.seedInitialBookings();
+    }
+  }
+
+  saveBookings() {
+    try {
+      const dataDir = path.dirname(this.bookingsFilePath);
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      const list = Array.from(this.bookings.values());
+      fs.writeFileSync(this.bookingsFilePath, JSON.stringify(list, null, 2));
+    } catch (err) {
+      console.warn('Failed to save bookings to disk:', err.message);
+    }
+  }
+
+  seedInitialBookings() {
+    const hotel1 = this.hotels.find(h => h.name?.toLowerCase().includes('taj') || h.trust_score >= 95) || this.hotels[0];
+    const hotel2 = this.hotels.find(h => h.name?.toLowerCase().includes('w goa') || h.trust_score >= 90) || this.hotels[1];
+
+    if (hotel1) {
+      const b1 = {
+        id: 'BK-GOA-' + Math.floor(1000 + Math.random() * 9000),
+        userId: 'traveler_default',
+        hotelId: hotel1.id,
+        hotelName: hotel1.name,
+        location: hotel1.location,
+        area: hotel1.area || 'North Goa',
+        price: hotel1.price || 8500,
+        price_display: hotel1.price_display || '₹8,500',
+        trust_score: hotel1.trust_score || 96,
+        trust_badge: hotel1.trust_badge || 'trusted',
+        guestName: 'Pranav',
+        guestEmail: 'pranav@staywu.com',
+        phoneNumber: '+91 98765 43210',
+        checkIn: '2026-09-22',
+        checkOut: '2026-09-26',
+        createdAt: '2026-09-20T10:30:00.000Z',
+        status: 'confirmed',
+        itinerary: 'North Goa Sunset & Heritage Tour',
+        preferences: { interests: ['Beaches', 'Nightlife', 'Seafood'], pace: 'balanced' },
+      };
+      this.bookings.set(b1.id, b1);
+    }
+
+    if (hotel2) {
+      const b2 = {
+        id: 'BK-GOA-' + Math.floor(1000 + Math.random() * 9000),
+        userId: 'traveler_default',
+        hotelId: hotel2.id,
+        hotelName: hotel2.name,
+        location: hotel2.location,
+        area: hotel2.area || 'Vagator',
+        price: hotel2.price || 14000,
+        price_display: hotel2.price_display || '₹14,000',
+        trust_score: hotel2.trust_score || 94,
+        trust_badge: hotel2.trust_badge || 'verified',
+        guestName: 'Pranav',
+        guestEmail: 'pranav@staywu.com',
+        phoneNumber: '+91 98765 43210',
+        checkIn: '2026-08-14',
+        checkOut: '2026-08-18',
+        createdAt: '2026-08-10T14:15:00.000Z',
+        status: 'completed',
+        itinerary: 'Monsoon Coastline & Shack Crawl',
+        preferences: { interests: ['Water Sports', 'Sunset Points'], pace: 'relaxed' },
+      };
+      this.bookings.set(b2.id, b2);
+    }
+
+    this.saveBookings();
   }
 
   // Search hotels with filters
@@ -191,6 +280,7 @@ class DataService {
     };
 
     this.bookings.set(bookingId, booking);
+    this.saveBookings();
     return booking;
   }
 
@@ -199,12 +289,35 @@ class DataService {
     return this.bookings.get(bookingId);
   }
 
+  // Get user bookings
+  getUserBookings(userId = null, email = null) {
+    const all = Array.from(this.bookings.values());
+    if (!userId && !email) {
+      return all.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+
+    const filtered = all.filter(b => {
+      if (userId && b.userId === userId) return true;
+      if (email && b.guestEmail && b.guestEmail.toLowerCase() === email.toLowerCase()) return true;
+      if ((!userId || userId === 'traveler_default') && (!b.userId || b.userId === 'traveler_default')) return true;
+      return false;
+    });
+
+    if (filtered.length === 0) {
+      // Return sample demo bookings so UI displays rich data for presentation
+      return all.slice(0, 3);
+    }
+
+    return filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }
+
   // Update booking with preferences/itinerary
   updateBooking(bookingId, updates) {
     const booking = this.bookings.get(bookingId);
     if (!booking) return null;
     Object.assign(booking, updates);
     this.bookings.set(bookingId, booking);
+    this.saveBookings();
     return booking;
   }
 }

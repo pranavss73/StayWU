@@ -59,6 +59,20 @@ export function AuthProvider({ children }) {
     return sendPasswordResetEmail(auth, email);
   };
 
+  const updateUserProfile = async ({ displayName, photoURL }) => {
+    if (auth.currentUser) {
+      await updateProfile(auth.currentUser, {
+        ...(displayName ? { displayName } : {}),
+        ...(photoURL ? { photoURL } : {}),
+      });
+      setUser({
+        ...auth.currentUser,
+        ...(displayName ? { displayName } : {}),
+        ...(photoURL ? { photoURL } : {}),
+      });
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -69,6 +83,7 @@ export function AuthProvider({ children }) {
         loginWithGoogle,
         logout,
         resetPassword,
+        updateUserProfile,
       }}
     >
       {children}

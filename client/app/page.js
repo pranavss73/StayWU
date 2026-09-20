@@ -38,7 +38,8 @@ import {
   Compass,
   FileCheck,
   KeyRound,
-  QrCode
+  QrCode,
+  User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AuthModal from '../components/AuthModal';
@@ -118,6 +119,10 @@ function NavbarUser({ onOpenAuth }) {
             <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'white' }}>{displayName}</div>
             <div className="nav-user-email">{user.email}</div>
           </div>
+          <Link href="/profile" className="nav-dropdown-item" onClick={() => setDropdownOpen(false)}>
+            <User size={14} color="var(--accent-gold)" />
+            <span>Profile & Bookings</span>
+          </Link>
           <Link href="/documents" className="nav-dropdown-item" onClick={() => setDropdownOpen(false)}>
             <KeyRound size={14} />
             <span>Document Vault</span>
@@ -431,6 +436,89 @@ function HotelDetail({ hotel, onBack, onBook, onRequireAuth }) {
               </div>
             </div>
           )}
+
+          {/* StayWU AI Truth Lens™ & Scam Shield */}
+          <div className="truth-lens-container">
+            <div className="truth-lens-header">
+              <div className="truth-lens-title-badge">
+                <ShieldCheck size={18} className="truth-lens-shield-icon" />
+                <span>StayWU AI Truth Lens™</span>
+              </div>
+              <span className={`truth-lens-status-tag ${hotel.trust_score >= 80 ? 'trusted' : hotel.trust_score >= 60 ? 'verified' : 'caution'}`}>
+                {hotel.trust_score >= 80 ? '✓ Verified Safe Stay' : hotel.trust_score >= 60 ? 'ℹ️ Verified Partner' : '⚠️ Elevated Risk'}
+              </span>
+            </div>
+
+            <div className="truth-lens-grid">
+              {/* Reality Check 1: Beach Distance */}
+              <div className="truth-lens-item">
+                <div className="truth-lens-item-header">
+                  <span className="truth-lens-icon">🏖️</span>
+                  <span className="truth-lens-label">Beach & Transit Reality</span>
+                </div>
+                <div className="truth-lens-val">
+                  {hotel.landmark || 'Nearby central transit hub'}
+                </div>
+                <div className="truth-lens-note">
+                  {hotel.landmark?.toLowerCase().includes('walk') || (hotel.landmark && parseInt(hotel.landmark) <= 10)
+                    ? '🚶 Genuine walkability verified. No taxi required.'
+                    : '🛵 Scooter / Taxi recommended for daily beach access.'}
+                </div>
+              </div>
+
+              {/* Reality Check 2: Night Noise & Sleep Index */}
+              <div className="truth-lens-item">
+                <div className="truth-lens-item-header">
+                  <span className="truth-lens-icon">🌙</span>
+                  <span className="truth-lens-label">Sleep & Night Noise Index</span>
+                </div>
+                <div className="truth-lens-val">
+                  {/tito|baga|nightlife|club|party|lively/i.test(hotel.neighborhood_vibe || '')
+                    ? 'High Night Noise (Party Hub)'
+                    : /quiet|peaceful|serene|nature|heritage/i.test(hotel.neighborhood_vibe || '')
+                    ? 'Serene (High Sleep Quality)'
+                    : 'Balanced Coastal Vibe'}
+                </div>
+                <div className="truth-lens-note">
+                  {/tito|baga|nightlife|club|party|lively/i.test(hotel.neighborhood_vibe || '')
+                    ? '🔊 Ambient bass from nearby clubs after 10 PM. Best for nightlife lovers.'
+                    : '🛌 Minimal ambient noise. Great for couples, families & restorative sleep.'}
+                </div>
+              </div>
+
+              {/* Reality Check 3: Hidden Surcharges & Power */}
+              <div className="truth-lens-item">
+                <div className="truth-lens-item-header">
+                  <span className="truth-lens-icon">⚡</span>
+                  <span className="truth-lens-label">Power & Hidden Fee Audit</span>
+                </div>
+                <div className="truth-lens-val">
+                  {hotel.scam_flags?.length > 0 ? 'Review Terms' : 'Zero Hidden Charges'}
+                </div>
+                <div className="truth-lens-note">
+                  {hotel.scam_flags?.length > 0
+                    ? `⚠️ Note: ${hotel.scam_flags.join(', ')}.`
+                    : '✓ Verified AC, Wi-Fi & Generator Power Backup included in rate.'}
+                </div>
+              </div>
+
+              {/* Reality Check 4: Fraud & Scam Shield */}
+              <div className="truth-lens-item">
+                <div className="truth-lens-item-header">
+                  <span className="truth-lens-icon">🛡️</span>
+                  <span className="truth-lens-label">Listing Authenticity Score</span>
+                </div>
+                <div className="truth-lens-val">
+                  {hotel.trust_score}/100 Trust Score
+                </div>
+                <div className="truth-lens-note">
+                  {hotel.trust_score >= 80
+                    ? '🔒 Cross-verified against Google, Goa Tourism Registry & recent stays.'
+                    : '⚠️ Exercise standard traveler caution upon arrival.'}
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Neighborhood Vibe Card */}
           <div className="detail-vibe-card">

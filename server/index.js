@@ -15,6 +15,7 @@ const hotelsRoutes = require('./routes/hotels');
 const chatRoutes = require('./routes/chat');
 const bookingsRoutes = require('./routes/bookings');
 const vaultRoutes = require('./routes/vault');
+const memoriesRoutes = require('./routes/memories');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -47,6 +48,7 @@ app.use('/api/hotels', hotelsRoutes(dataService));
 app.use('/api/chat', chatRoutes(dataService, llmService));
 app.use('/api/bookings', bookingsRoutes(dataService));
 app.use('/api/vault', vaultRoutes(vaultService));
+app.use('/api/memories', memoriesRoutes(tripBot, llmService));
 
 // Places endpoint
 app.get('/api/places', (req, res) => {
