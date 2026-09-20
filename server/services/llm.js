@@ -444,6 +444,25 @@ YOUR GUIDELINES:
     }
   }
 
+  // Generate a short social-ready line for the fixed StayWU Memory Dump template.
+  async generateMemoryCaption(booking, memories = []) {
+    const places = memories.map(m => m.place).filter(Boolean).join(', ');
+    const prompt = `Create one short, warm travel-memory caption (maximum 9 words) for a social-media-ready photo dump.
+Destination: ${booking?.location || 'Goa'}
+Places captured: ${places || 'the trip'}
+Do not use hashtags. Do not mention facts not supplied. Output only the caption.`;
+
+    try {
+      const text = await this.generateWithFallback({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.8, maxOutputTokens: 40 }
+      });
+      return text.trim().replace(/^['"]|['"]$/g, '').replace(/\n/g, ' ');
+    } catch {
+      return 'Collecting moments, not things.';
+    }
+  }
+
   // Generate neighborhood vibe summary
   async generateVibeSummary(hotelName, location, landmark, amenities) {
     const prompt = `Generate a one-line neighborhood vibe summary (max 15 words) for a hotel:

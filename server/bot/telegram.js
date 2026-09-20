@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const PDFItineraryGenerator = require('../services/pdfGenerator');
 const WeatherService = require('../services/weather');
+const MemoryDumpService = require('../services/memoryDump');
 
 class TripBot {
   constructor(token, dataService, llmService, vaultService = null) {
@@ -16,12 +17,18 @@ class TripBot {
     this.dataService = dataService;
     this.llmService = llmService;
     this.vaultService = vaultService;
+    this.memoryDumpService = new MemoryDumpService();
 
     // User session storage: chatId -> { state, booking, preferences, history, itinerary }
     this.sessions = new Map();
 
     this.registerCommands();
     this.setupHandlers();
+
+    this.memoryTimer = setInterval(() => {
+      this.checkCompletedMemoryDumps().catch(err => console.warn('Memory scheduler warning:', err.message));
+    }, 5 * 60 * 1000);
+
     console.log('🤖 Telegram Bot started!');
   }
 
@@ -33,6 +40,8 @@ class TripBot {
         { command: 'link', description: 'Link Telegram to StayWU account with 6-digit code' },
         { command: 'plan', description: 'Generate a personalized Goa travel itinerary' },
         { command: 'pdf', description: 'Download trip itinerary and vouchers as PDF' },
+        { command: 'memory', description: 'Create your 5-photo Trip Memory Dump' },
+        { command: 'memorynow', description: 'Generate your Memory Dump now (demo)' },
         { command: 'help', description: 'Show concierge commands and guide' },
       ]);
     } catch (err) {
@@ -72,6 +81,10 @@ class TripBot {
             preferences: {},
             history: [],
             itinerary: null,
+            memoryPhotos: [],
+            memoryCollectionActive: false,
+            memoryPendingPhoto: null,
+            memoryDumpGenerated: false,
           });
 
           await this.bot.sendMessage(chatId,
@@ -121,6 +134,10 @@ class TripBot {
         preferences: {},
         history: [],
         itinerary: null,
+        memoryPhotos: [],
+        memoryCollectionActive: false,
+        memoryPendingPhoto: null,
+        memoryDumpGenerated: false,
       });
 
       await this.bot.sendMessage(chatId,
@@ -253,6 +270,16 @@ class TripBot {
           );
           return;
         }
+
+        if (data === 'generate_memory_now') {
+          await this.generateMemoryDump(chatId, true);
+          return;
+        }
+
+        if (data === 'start_memory_collection') {
+          await this.startMemoryCollection(chatId);
+          return;
+        }
         // Vault help
         if (data === 'vault_help') {
           const frontendUrl = (this.vaultService?.frontendBaseUrl || 'http://127.0.0.1:3000').replace('//localhost', '//127.0.0.1');
@@ -329,6 +356,18 @@ class TripBot {
             await this.generateAndSendItinerary(msg.chat.id);
             return;
           }
+          // Handle /memory command
+          if (msg.text.match(/^\/memory(?:@\w+)?(?:\s|$)/i)) {
+            await this.startMemoryCollection(msg.chat.id);
+            return;
+          }
+
+          // Handle /memorynow command (hackathon demo shortcut)
+          if (msg.text.match(/^\/memorynow(?:@\w+)?(?:\s|$)/i)) {
+            await this.generateMemoryDump(msg.chat.id, true);
+            return;
+          }
+
           // Handle /help command
           if (msg.text.match(/^\/help(?:@\w+)?(?:\s|$)/i)) {
             await this.bot.sendMessage(msg.chat.id,
@@ -337,6 +376,8 @@ class TripBot {
               `/link <code> — Connect your Telegram account to StayWU Vault\n` +
               `/plan — Generate a new personalized itinerary\n` +
               `/pdf — Download your itinerary and vouchers as PDF\n` +
+              `/memory — Collect 5 photos for your Trip Memory Dump\n` +
+              `/memorynow — Generate the dump immediately (demo)\n` +
               `/help — Show this help message\n\n` +
               `Or just type any question about Goa! 🌴`,
               { parse_mode: 'Markdown' }
@@ -351,6 +392,26 @@ class TripBot {
 
         if (!session) {
           await this.bot.sendMessage(chatId, 'Please start with /start to begin! 🌴');
+          return;
+        }
+
+        if (msg.photo) {
+          await this.handleMemoryPhoto(chatId, msg);
+          return;
+        }
+
+        if (session.memoryPendingPhoto && msg.text) {
+          const parsed = this.parseMemoryMetadata(msg.text, msg.date);
+          if (!parsed) {
+            await this.bot.sendMessage(chatId,
+              'Please use this format for the photo:\n\n*Place | Date*\nExample: `Baga Beach | 12 Sep 2026`',
+              { parse_mode: 'Markdown' }
+            );
+            return;
+          }
+          session.memoryPhotos.push({ ...session.memoryPendingPhoto, ...parsed });
+          session.memoryPendingPhoto = null;
+          await this.acknowledgeMemoryPhoto(chatId);
           return;
         }
 
@@ -370,6 +431,201 @@ class TripBot {
         console.warn('Telegram message error:', err.message);
       }
     });
+  }
+
+  async startMemoryCollection(chatId) {
+    const session = this.sessions.get(chatId);
+    if (!session) {
+      await this.bot.sendMessage(chatId, 'Please start with /start first so I can connect your memories to the trip. 🌴');
+      return;
+    }
+
+    session.memoryCollectionActive = true;
+    session.memoryPhotos = [];
+    session.memoryPendingPhoto = null;
+    session.memoryDumpGenerated = false;
+
+    await this.bot.sendMessage(chatId,
+      `🧠 *StayWU Trip Memory Dump*\n\n` +
+      `Upload exactly *5 photos* from your trip.\n\n` +
+      `For each photo, add a caption in this format:\n` +
+      `*Place | Date*\n\n` +
+      `Example:\n` +
+      '`Baga Beach | 12 Sep 2026`\n\n' +
+      `I'll arrange them automatically in the fixed StayWU 9:16 scrapbook template — ready for WhatsApp Status / Instagram Story. ✨`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  parseMemoryMetadata(text, telegramTimestamp) {
+    const raw = String(text || '').trim();
+    const parts = raw.split('|');
+    if (parts.length < 2) return null;
+
+    const place = parts[0].trim();
+    const dateText = parts.slice(1).join('|').trim();
+    if (!place || !dateText) return null;
+
+    const parsedDate = new Date(dateText);
+    if (Number.isNaN(parsedDate.getTime())) return null;
+
+    return {
+      place,
+      dateLabel: dateText,
+      takenAt: parsedDate.toISOString(),
+      telegramTimestamp: telegramTimestamp ? new Date(telegramTimestamp * 1000).toISOString() : new Date().toISOString(),
+    };
+  }
+
+  async handleMemoryPhoto(chatId, msg) {
+    const session = this.sessions.get(chatId);
+    if (!session) return;
+
+    if (!session.memoryCollectionActive) {
+      await this.bot.sendMessage(chatId,
+        `📸 I can turn 5 of your trip photos into a StayWU Memory Dump.\n\nUse /memory to start collecting them.`
+      );
+      return;
+    }
+
+    if (session.memoryPhotos.length >= 5) {
+      await this.bot.sendMessage(chatId, 'You already have 5 photos. I am ready to create your Memory Dump. ✨');
+      return;
+    }
+
+    const largest = msg.photo[msg.photo.length - 1];
+    const base = { fileId: largest.file_id };
+
+    if (msg.caption) {
+      const parsed = this.parseMemoryMetadata(msg.caption, msg.date);
+      if (parsed) {
+        session.memoryPhotos.push({ ...base, ...parsed });
+        await this.acknowledgeMemoryPhoto(chatId);
+        return;
+      }
+    }
+
+    session.memoryPendingPhoto = base;
+    await this.bot.sendMessage(chatId,
+      `📍 *Photo ${session.memoryPhotos.length + 1}/5 received.*\n\nWhere and when was this photo taken?\nReply like:\n\n*Place | Date*\n\nExample: \`Palolem Beach | 14 Sep 2026\``,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  async acknowledgeMemoryPhoto(chatId) {
+    const session = this.sessions.get(chatId);
+    if (!session) return;
+
+    const count = session.memoryPhotos.length;
+    if (count < 5) {
+      await this.bot.sendMessage(chatId,
+        `📸 *Memory ${count}/5 saved!*\nSend your next photo with its place and date.`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
+    session.memoryCollectionActive = false;
+    const complete = this.isTripComplete(session.booking);
+
+    if (complete) {
+      await this.generateMemoryDump(chatId, true);
+    } else {
+      await this.bot.sendMessage(chatId,
+        `✨ *5/5 memories collected!*\n\nYour photos are ready. StayWU will automatically create the final Memory Dump after your checkout date.\n\nFor the hackathon demo, you can generate it now:`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '✨ Generate Memory Dump Now', callback_data: 'generate_memory_now' }],
+            ],
+          },
+        }
+      );
+    }
+  }
+
+  isTripComplete(booking) {
+    if (!booking?.checkOut) return false;
+    const raw = String(booking.checkOut).trim();
+    let checkout;
+
+    // Booking forms normally store YYYY-MM-DD. Treat checkout as the end of
+    // that local calendar day rather than midnight at the start of the date.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      checkout = new Date(`${raw}T23:59:59`);
+    } else {
+      checkout = new Date(raw);
+    }
+
+    if (Number.isNaN(checkout.getTime())) return false;
+    return Date.now() >= checkout.getTime();
+  }
+
+  async checkCompletedMemoryDumps() {
+    for (const [chatId, session] of this.sessions.entries()) {
+      if (!session || session.memoryDumpGenerated || session.memoryPhotos?.length !== 5) continue;
+      if (!this.isTripComplete(session.booking)) continue;
+      await this.generateMemoryDump(chatId, true);
+    }
+  }
+
+  async generateMemoryDump(chatId, force = false) {
+    const session = this.sessions.get(chatId);
+    if (!session) return;
+
+    if (session.memoryPhotos?.length !== 5) {
+      await this.bot.sendMessage(chatId,
+        `🧠 Your Memory Dump needs exactly 5 photos.\n\nUse /memory and upload ${5 - (session.memoryPhotos?.length || 0)} more photo(s).`
+      );
+      return;
+    }
+
+    if (!force && !this.isTripComplete(session.booking)) return;
+
+    await this.bot.sendMessage(chatId, '🎨 *Creating your StayWU Memory Dump...*\n\nArranging your 5 memories into the scrapbook template. ✨', { parse_mode: 'Markdown' });
+
+    try {
+      let caption = 'Collecting moments, not things.';
+      try {
+        caption = await this.llmService.generateMemoryCaption(session.booking, session.memoryPhotos);
+      } catch (e) {
+        console.warn('Memory caption AI fallback:', e.message);
+      }
+
+      const result = await this.memoryDumpService.createMemoryDump({
+        chatId,
+        booking: session.booking,
+        photos: session.memoryPhotos.map(photo => ({ ...photo, bot: this.bot })),
+        caption,
+      });
+
+      session.memoryDumpGenerated = true;
+
+      if (result.pngPath && fs.existsSync(result.pngPath)) {
+        await this.bot.sendPhoto(chatId, result.pngPath, {
+          caption: `🌴 *Your StayWU Trip Memory Dump*\n\n1080 × 1920 • WhatsApp Status / Instagram Story ready`,
+          parse_mode: 'Markdown',
+        });
+        await this.bot.sendDocument(chatId, result.pngPath, {
+          caption: `📥 Download the full-resolution Memory Dump and share it anywhere.\n\n#StayWU #TripMemory`,
+        });
+      } else {
+        await this.bot.sendDocument(chatId, result.svgPath, {
+          caption: `📥 Your Memory Dump is ready as a 1080 × 1920 SVG. Open it in a browser and export/download as PNG for social media.`,
+        });
+      }
+
+      await this.bot.sendMessage(chatId,
+        `💛 *Trip complete. Memories saved.*\n\nYour 5-photo StayWU Memory Dump is ready to share.`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (error) {
+      console.error('Memory Dump generation error:', error);
+      await this.bot.sendMessage(chatId,
+        '❌ I could not create the Memory Dump this time. Please try /memorynow again.'
+      );
+    }
   }
 
   async confirmAndGenerate(chatId) {
