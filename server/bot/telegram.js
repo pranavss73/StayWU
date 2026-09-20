@@ -28,6 +28,7 @@ class TripBot {
     this.memoryTimer = setInterval(() => {
       this.checkCompletedMemoryDumps().catch(err => console.warn('Memory scheduler warning:', err.message));
     }, 5 * 60 * 1000);
+    if (this.memoryTimer.unref) this.memoryTimer.unref();
 
     console.log('🤖 Telegram Bot started!');
   }
@@ -467,12 +468,12 @@ class TripBot {
     if (!place || !dateText) return null;
 
     const parsedDate = new Date(dateText);
-    if (Number.isNaN(parsedDate.getTime())) return null;
+    const validDate = !Number.isNaN(parsedDate.getTime()) ? parsedDate : new Date();
 
     return {
       place,
       dateLabel: dateText,
-      takenAt: parsedDate.toISOString(),
+      takenAt: validDate.toISOString(),
       telegramTimestamp: telegramTimestamp ? new Date(telegramTimestamp * 1000).toISOString() : new Date().toISOString(),
     };
   }

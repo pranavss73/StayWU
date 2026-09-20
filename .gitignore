@@ -31,6 +31,8 @@ server/temp/
 StayWU_QR/
 server/storage/vault_docs/*
 !server/storage/vault_docs/.gitkeep
+server/memory_data/
+memory_data/
 *.pdf
 *.log
 npm-debug.log*
