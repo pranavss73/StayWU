@@ -8,7 +8,7 @@ class LLMService {
     this.currentKeyIndex = 0;
 
     // Prioritized model cascade: fast modern flash models
-    this.models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+    this.models = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash'];
 
     // In-memory query cache: hash -> { text, timestamp } (1 hour TTL)
     this.cache = new Map();

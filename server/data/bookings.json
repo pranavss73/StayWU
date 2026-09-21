@@ -71,5 +71,23 @@
     "status": "confirmed",
     "itinerary": null,
     "preferences": null
+  },
+  {
+    "id": "BKMUBEMZVH5BJ",
+    "userId": "OLmyKQGQn1bF8TIKfZpPAC8IKva2",
+    "hotelId": 110,
+    "hotelName": "Grandeur Stay",
+    "location": "Panjim",
+    "area": "Central Goa",
+    "price": 2767,
+    "guestName": "aa bb",
+    "guestEmail": "aabb@gmail.com",
+    "phoneNumber": "",
+    "checkIn": "2026-09-22",
+    "checkOut": "2026-09-23",
+    "createdAt": "2026-09-21T15:33:15.677Z",
+    "status": "confirmed",
+    "itinerary": null,
+    "preferences": null
   }
 ]
