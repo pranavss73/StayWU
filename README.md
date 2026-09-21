@@ -83,9 +83,13 @@ npm run dev
 ```
 *Or on Windows, double-click `start.bat`.*
 
-- **Web Frontend**: [http://localhost:3000](http://localhost:3000)
-- **Backend API**: [http://localhost:3001](http://localhost:3001)
-- **API Health Check**: [http://localhost:3001/api/health](http://localhost:3001/api/health)
+- **Web Frontend**: [https://staywu.vercel.app/](https://staywu.vercel.app/)
+- **Backend API**: [https://staywu-backend.onrender.com
+](https://staywu-backend.onrender.com
+)
+- **API Health Check**: [https://staywu-backend.onrender.com/api/health
+](https://staywu-backend.onrender.com/api/health
+)
 
 ---
 
